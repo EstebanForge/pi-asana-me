@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.1.0 — 2026-07-08
+
+### Added
+- `asana_get_task_description` — full, untruncated task notes/description
+  for a single GID. `asana_get_task` caps `notes` at ~2000 chars to keep its
+  default payload cheap, which hides the acceptance criteria, background,
+  and implementation detail an agent needs to actually perform the task.
+  When the cap fires, `asana_get_task` now prints a
+  `[truncated; call asana_get_task_description for the full text]` marker;
+  the agent reaches for this tool to recover the whole body. Asks only for
+  `name,notes`, no other projection.
+
+### Changed
+- `asana_get_task` no longer silently slices `notes` at 400 chars. It now caps
+  at 2000 chars (most real task specs render inline; only very long bodies
+  trip the marker) and prints an explicit marker pointing at
+  `asana_get_task_description` when the body overflows. Notes at or under the
+  cap render inline, unchanged. Also fixed: empty-string `notes` previously
+  dropped the line entirely (falsy guard); now renders as an empty line via a
+  type-based guard.
+
 ## 1.0.0 — 2026-07-06
 
 Initial release.

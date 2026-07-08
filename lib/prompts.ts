@@ -56,6 +56,10 @@ export const GET_TASK_GID_DESCRIPTION =
 export const GET_TASK_OPT_FIELDS_DESCRIPTION =
   "Optional opt_fields. Default includes subtasks, dependencies, parent, custom fields.";
 
+export const GET_TASK_NOTES_TITLE = "Asana: Get Task Description";
+
+export const GET_TASK_NOTES_DESCRIPTION = `Full, untruncated notes (description) for a single task GID. asana_get_task caps notes at ~2000 chars to keep its payload cheap; call THIS tool when you need the complete description body to understand or perform the task (e.g. acceptance criteria, background, implementation notes). Returns only gid, name, and the full notes (output labeled \`description:\`). Use AFTER you already have a task GID from asana_search_objects, asana_get_tasks, or asana_get_task.`;
+
 export const GET_TASKS_TITLE = "Asana: List Tasks";
 
 export const GET_TASKS_DESCRIPTION = `Filtered list of tasks. Require at least one of: project, section, tag, OR (assignee AND workspace). Assignee alone or workspace alone both 400. Use for bulk reads. For partial name search, prefer asana_search_objects.`;

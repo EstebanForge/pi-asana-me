@@ -92,7 +92,21 @@ export const getTaskTool: ToolDefinition<typeof Params, undefined> = {
       if (typeof task.start_on === "string") lines.push(`  start_on: ${task.start_on}`);
       if (typeof task.created_at === "string") lines.push(`  created_at: ${task.created_at}`);
       if (typeof task.modified_at === "string") lines.push(`  modified_at: ${task.modified_at}`);
-      if (task.notes) lines.push(`  notes: ${task.notes.slice(0, 400)}`);
+      // asana_get_task deliberately caps notes to keep the default payload
+      // cheap; when the body overflows the cap, point the agent at
+      // asana_get_task_description to recover the full, untruncated text.
+      // The cap sits just below the worst-case "long-ish spec" so everyday
+      // tasks render inline without the marker.
+      const NOTES_LIMIT = 2000;
+      if (typeof task.notes === "string") {
+        if (task.notes.length > NOTES_LIMIT) {
+          lines.push(
+            `  notes: ${task.notes.slice(0, NOTES_LIMIT)}... [truncated; call asana_get_task_description for the full text]`,
+          );
+        } else {
+          lines.push(`  notes: ${task.notes}`);
+        }
+      }
 
       // Parent (this task is a subtask of <X>).
       if (task.parent?.gid) {

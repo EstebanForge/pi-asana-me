@@ -1,13 +1,13 @@
 /**
  * pi-asana - Asana Work Graph tools for pi.
  *
- * Adds 12 LLM-callable tools that talk to the Asana REST API
+ * Adds 13 LLM-callable tools that talk to the Asana REST API
  * (https://app.asana.com/api/1.0) over plain HTTP+JSON. No MCP server install
  * is required: this extension issues standard REST calls with a personal
  * access token (PAT) read from the ASANA_ACCESS_TOKEN environment variable.
  *
  * The tool surface mirrors a curated subset of the official Asana MCP server
- * (https://developers.asana.com/docs/mcp-tools-reference). The 12 tools cover
+ * (https://developers.asana.com/docs/mcp-tools-reference). The 13 tools cover
  * the read-then-write flows an LLM agent actually needs; noisy duplicates and
  * Claude/ChatGPT-only confirmation-UI tools are intentionally omitted.
  *
@@ -22,6 +22,7 @@ import { searchObjectsTool } from "../lib/tools/search";
 import { getMeTool } from "../lib/tools/me";
 import { getMyTasksTool } from "../lib/tools/my-tasks";
 import { getTaskTool } from "../lib/tools/task";
+import { getTaskDescriptionTool } from "../lib/tools/task-description";
 import { getTasksTool } from "../lib/tools/tasks";
 import { getProjectTool, getProjectsTool } from "../lib/tools/project";
 import { statusOverviewTool } from "../lib/tools/status";
@@ -38,6 +39,7 @@ const TOOL_GUIDANCE = [
   'Use asana_search_objects FIRST when you do not know a GID; pass a workspace from asana_get_me as "workspace".',
   "Use asana_get_my_tasks as the shortcut for the authenticated user\u2019s task list.",
   "Use asana_get_tasks with one of project/section/tag/assignee for bulk reads; asana_get_task for full detail on one task.",
+  "asana_get_task truncates the notes/description to ~400 chars; call asana_get_task_description for the full, untruncated body when you need the whole spec.",
   "Use asana_get_status_overview for cross-project rollups; do not chain a search before it.",
   "Comments live on the stories endpoint, not the task; use asana_get_task_comments to read recent comment threads on demand (default: last 5).",
   "Write tools (asana_create_tasks, asana_update_tasks, asana_add_comment) change data immediately; confirm with the user before invoking on a workspace.",
@@ -48,6 +50,7 @@ function asana(pi: ExtensionAPI): void {
   pi.registerTool(searchObjectsTool);
   pi.registerTool(getMyTasksTool);
   pi.registerTool(getTaskTool);
+  pi.registerTool(getTaskDescriptionTool);
   pi.registerTool(getTasksTool);
   pi.registerTool(getProjectTool);
   pi.registerTool(getProjectsTool);

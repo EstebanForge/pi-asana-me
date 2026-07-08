@@ -92,3 +92,50 @@ describe("asana_get_task default projection", () => {
     expect(text).toContain("[ ] Second sub (gid: s2)");
   });
 });
+
+// asana_get_task caps notes at 2000 chars. When the body overflows, it must
+// print an explicit marker pointing at asana_get_task_description so the
+// agent knows the full text is one call away. Silent truncation is the bug
+// this guard exists to prevent.
+describe("asana_get_task notes truncation marker", () => {
+  it("appends a pointer to asana_get_task_description when notes exceed 2000 chars", async () => {
+    const longNotes = "y".repeat(2500);
+    const { text } = await callGetTask(
+      { gid: "big" },
+      vi.fn().mockResolvedValue(
+        makeResponse({ data: { gid: "big", name: "Big", notes: longNotes } }),
+      ),
+    );
+    expect(text).toContain("[truncated; call asana_get_task_description for the full text]");
+    // Truncated prefix present, but NOT the tail beyond the cap.
+    expect(text).toContain("y".repeat(2000));
+    expect(text).not.toContain("y".repeat(2001));
+  });
+
+  it("renders notes inline with no marker when at or under 2000 chars", async () => {
+    const shortNotes = "z".repeat(2000);
+    const { text } = await callGetTask(
+      { gid: "small" },
+      vi.fn().mockResolvedValue(
+        makeResponse({ data: { gid: "small", name: "Small", notes: shortNotes } }),
+      ),
+    );
+    expect(text).toContain(`notes: ${shortNotes}`);
+    expect(text).not.toContain("truncated");
+  });
+
+  // Regression: `if (task.notes)` is falsy for the empty string, which used
+  // to drop the notes line entirely. The guard must be type-based so an
+  // empty body still renders (as an empty notes line), matching
+  // asana_get_task_description's behavior.
+  it("renders an empty notes line when notes is an empty string", async () => {
+    const { text } = await callGetTask(
+      { gid: "empty" },
+      vi.fn().mockResolvedValue(
+        makeResponse({ data: { gid: "empty", name: "Empty", notes: "" } }),
+      ),
+    );
+    expect(text).toContain("notes: ");
+    expect(text).not.toContain("truncated");
+  });
+});

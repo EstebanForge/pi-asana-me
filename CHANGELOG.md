@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.2.1 — 2026-07-09
+
+### Changed
+- The three write tools are now flat `export const` objects, uniform with
+  the read tools. `confirmWrite` takes no `pi` arg: it never read `pi.getFlag`
+  (flags are in-memory only with no setter, so the gate is file-backed), making
+  the prior `createXxxTool(pi)` factory's `pi` arg vestigial. Tool behavior and
+  parameters are unchanged.
+- Removed the orphaned `makePi()` test helper. Fixed a stale `me.test` comment
+  that attributed gate-bypass to the flag value when it is actually the headless
+  ctx (`hasUI:false`).
+
 ## 1.2.0 — 2026-07-09
 
 ### Added

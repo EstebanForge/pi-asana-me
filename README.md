@@ -44,6 +44,23 @@ Create a personal access token at <https://app.asana.com/0/my-apps> &rarr; **Cre
 
 If the environment variable is missing, every tool returns a single error message pointing to this section.
 
+### Write review gate (default on)
+
+The three write tools (`asana_add_comment`, `asana_create_tasks`, `asana_update_tasks`) prompt you for review before posting:
+
+- **Comments** open in an editable preview &mdash; trim the model's prose, then accept (Enter) or cancel (Esc). The posted text is whatever you leave in the editor.
+- **Task batches** show a readable summary and ask yes/no.
+- In **headless** sessions (no interactive UI) the gate is skipped so unsupervised runs never deadlock.
+
+Toggle it:
+
+| Command | Effect |
+| --- | --- |
+| `/asana config` | Settings modal (TUI) to toggle the gate; status line elsewhere. |
+| `/asana confirm on` / `/asana confirm off` | One-shot toggle. |
+
+The value is persisted in `<piDir>/pi-asana.json` (`{ "confirmWrite": bool }`), where `<piDir>` is `process.env.PI_CODING_AGENT_DIR || ~/.pi/agent`. The `asana-confirm-write` flag is also registered for `/settings` visibility and the `--asana-confirm-write` CLI override, but the gate reads the JSON file.
+
 ## Usage
 
 You do not need to mention Asana. The agent reaches for these tools whenever a request touches Asana data:
@@ -81,6 +98,8 @@ Slash command (pinned intent): `/asana <verb>` prefills the editor with an expli
 | `/asana status <gid>...` | asana_get_status_overview |
 | `/asana comments <gid> [N]` | asana_get_task_comments (last N comments; default 5) |
 | `/asana create <text>` | asana_create_tasks |
+| `/asana config` | Toggle the write review gate (settings modal in TUI) |
+| `/asana confirm on\|off` | Toggle the write review gate (one-shot) |
 
 Bare `/asana` prints a usage reminder.
 
@@ -96,11 +115,11 @@ Reach for them in this order:
 6. `asana_get_task_description` &mdash; the full, untruncated task notes/description. `asana_get_task` truncates notes to ~400 chars and prints a marker; reach for this when you need the whole body (acceptance criteria, background, implementation notes).
 7. `asana_get_status_overview` &mdash; aggregated status report (do not chain a search before it).
 8. `asana_get_task_comments` &mdash; clarifications and reviewer threads live in comments, not in `notes`. Pull on demand when the task context is a conversation, not a record.
-9. Write tools (`create_tasks`, `update_tasks`, `add_comment`) &mdash; only after you have the IDs, and confirm with the user first.
+9. Write tools (`create_tasks`, `update_tasks`, `add_comment`) &mdash; only after you have the IDs. The extension shows the drafted payload for accept/edit/cancel; you do not need to ask the user first.
 
 ## Notes
 
-- These tools make real calls against your Asana workspace. Write tools (`create_tasks`, `update_tasks`, `add_comment`) **change data** in your workspace immediately, without a confirmation step. Asana does not currently expose a confirmation/preview tool on the REST side for these.
+- These tools make real calls against your Asana workspace. Write tools (`create_tasks`, `update_tasks`, `add_comment`) prompt you for review before posting when the write review gate is on (default); see [Configuration](#configuration).
 - The typeahead endpoint (`asana_search_objects`) accepts only ONE resource type per call (single enum `task` / `project` / `user` / `tag`); it does not accept a CSV. Call the tool once per type to fan out across types.
 - The `/tasks` endpoint requires either project/section/tag, OR (assignee AND workspace). `asana_get_my_tasks` enforces this by making `workspace` a required parameter.
 - Asana enforces rate limits (~150 req/min per PAT). A 429 response surfaces a clear retry message.

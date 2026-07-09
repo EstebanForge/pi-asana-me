@@ -17,7 +17,12 @@
  * Based on: Asana REST API - https://developers.asana.com/reference
  *           Asana MCP V2 server - https://developers.asana.com/docs/mcp-tools-reference
  */
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ExtensionCommandContext,
+} from "@earendil-works/pi-coding-agent";
+import { getSettingsListTheme } from "@earendil-works/pi-coding-agent";
+import { Container, SettingsList, Text, type SettingItem } from "@earendil-works/pi-tui";
 import { searchObjectsTool } from "../lib/tools/search";
 import { getMeTool } from "../lib/tools/me";
 import { getMyTasksTool } from "../lib/tools/my-tasks";
@@ -26,10 +31,16 @@ import { getTaskDescriptionTool } from "../lib/tools/task-description";
 import { getTasksTool } from "../lib/tools/tasks";
 import { getProjectTool, getProjectsTool } from "../lib/tools/project";
 import { statusOverviewTool } from "../lib/tools/status";
-import { createTasksTool } from "../lib/tools/create-tasks";
-import { updateTasksTool } from "../lib/tools/update-tasks";
-import { addCommentTool } from "../lib/tools/comment";
+import { createCreateTasksTool } from "../lib/tools/create-tasks";
+import { createUpdateTasksTool } from "../lib/tools/update-tasks";
+import { createAddCommentTool } from "../lib/tools/comment";
 import { getTaskCommentsTool } from "../lib/tools/task-comments";
+import {
+  CONFIRM_WRITE_FLAG,
+  CONFIRM_WRITE_FLAG_DESCRIPTION,
+  getConfirmWriteEnabled,
+  setConfirmWriteEnabled,
+} from "../lib/confirm";
 
 // Compact tool guidance appended to the system prompt. Intentionally small:
 // the tool descriptions themselves carry the detail; this just tells the
@@ -42,10 +53,22 @@ const TOOL_GUIDANCE = [
   "asana_get_task truncates the notes/description to ~400 chars; call asana_get_task_description for the full, untruncated body when you need the whole spec.",
   "Use asana_get_status_overview for cross-project rollups; do not chain a search before it.",
   "Comments live on the stories endpoint, not the task; use asana_get_task_comments to read recent comment threads on demand (default: last 5).",
-  "Write tools (asana_create_tasks, asana_update_tasks, asana_add_comment) change data immediately; confirm with the user before invoking on a workspace.",
+  "Write tools (asana_create_tasks, asana_update_tasks, asana_add_comment) prompt the user for review before posting to Asana when the `asana-confirm-write` flag is on (default). Call them directly: the extension shows the drafted payload for accept/edit/cancel. The agent does NOT need to ask the user itself.",
 ].join(" ");
 
 function asana(pi: ExtensionAPI): void {
+  // Register the flag for /settings visibility and CLI `--asana-confirm-write`
+  // override ONLY. The gate itself reads file-backed module state
+  // (lib/confirm.ts getConfirmWriteEnabled) because pi extension flags are
+  // in-memory-only with no setFlag API and no persistence path. The default
+  // mirrors the on-disk default so /settings shows a truthful value before
+  // the user has ever toggled.
+  pi.registerFlag(CONFIRM_WRITE_FLAG, {
+    description: CONFIRM_WRITE_FLAG_DESCRIPTION,
+    type: "boolean",
+    default: true,
+  });
+
   pi.registerTool(getMeTool);
   pi.registerTool(searchObjectsTool);
   pi.registerTool(getMyTasksTool);
@@ -55,9 +78,9 @@ function asana(pi: ExtensionAPI): void {
   pi.registerTool(getProjectTool);
   pi.registerTool(getProjectsTool);
   pi.registerTool(statusOverviewTool);
-  pi.registerTool(createTasksTool);
-  pi.registerTool(updateTasksTool);
-  pi.registerTool(addCommentTool);
+  pi.registerTool(createCreateTasksTool(pi));
+  pi.registerTool(createUpdateTasksTool(pi));
+  pi.registerTool(createAddCommentTool(pi));
   pi.registerTool(getTaskCommentsTool);
 
   pi.on("before_agent_start", async (event) => {
@@ -81,6 +104,8 @@ function asana(pi: ExtensionAPI): void {
   //   /asana status <gids>            -> asana_get_status_overview
   //   /asana comments <gid> [N]       -> asana_get_task_comments
   //   /asana create <text>            -> hint with asana_create_tasks
+  //   /asana config                   -> settings modal (write review gate)
+  //   /asana confirm on|off           -> toggle write review gate
   //
   // Bare /asana prints a usage reminder. Command handlers cannot directly
   // dispatch a tool call (pi.sendUserMessage is session-scoped), so we use
@@ -88,12 +113,12 @@ function asana(pi: ExtensionAPI): void {
   // to run; the agent picks the right tool from the prefill.
   pi.registerCommand("asana", {
     description:
-      'Asana tools. Usage: /asana me | /asana my [incomplete|completed] | /asana show <gid> | /asana project <gid> | /asana search <workspace> <query> | /asana status <gid> [<gid>...] | /asana comments <gid> [N] | /asana create <free-form description>.',
+      'Asana tools. Usage: /asana me | /asana my [incomplete|completed] | /asana show <gid> | /asana project <gid> | /asana search <workspace> <query> | /asana status <gid> [<gid>...] | /asana comments <gid> [N] | /asana create <free-form description> | /asana config | /asana confirm on|off.',
     handler: async (args, ctx) => {
       const trimmed = args.trim();
       if (!trimmed) {
         ctx.ui.notify(
-          'Usage: /asana me | /asana my | /asana show <gid> | /asana project <gid> | /asana search <workspace> <query> | /asana status <gid>... | /asana comments <gid> [N] | /asana create <text>',
+          'Usage: /asana me | /asana my | /asana show <gid> | /asana project <gid> | /asana search <workspace> <query> | /asana status <gid>... | /asana comments <gid> [N] | /asana create <text> | /asana config | /asana confirm on|off',
           "info",
         );
         return;
@@ -183,17 +208,109 @@ function asana(pi: ExtensionAPI): void {
           prompt = `Call the asana_get_task_comments tool with task_gid="${gid}"${limitNote} to fetch the most-recent comments on that task.`;
           break;
         }
+        case "config": {
+          // /asana config -> interactive settings modal (TUI) or status (else).
+          // Mirrors the pi-glm-tweaks /glm-tweaks pattern: stage flips in the
+          // SettingsList, persist genuine deltas via `pi config set`, then a
+          // single reload so the in-memory flag value (read by the write tools
+          // via pi.getFlag) picks up the change. ctx is stale after reload,
+          // so we notify first and reload last.
+          await openConfigModal(ctx);
+          return;
+        }
+        case "confirm": {
+          // /asana confirm on|off -> one-shot toggle of the write review gate.
+          // File-backed (lib/confirm.ts setConfirmWriteEnabled): applies live,
+          // no reload needed.
+          const next = rest.toLowerCase();
+          if (next !== "on" && next !== "off") {
+            ctx.ui.notify('Usage: /asana confirm on|off', "warning");
+            return;
+          }
+          const value = next === "on";
+          if (setConfirmWriteEnabled(value)) {
+            ctx.ui.notify(`${CONFIRM_WRITE_FLAG}: ${next}.`, "info");
+          } else {
+            ctx.ui.notify(`Failed to persist ${CONFIRM_WRITE_FLAG} (disk write failed).`, "error");
+          }
+          return;
+        }
         case "create":
           prompt = `Help me create an Asana task. Read the user's request carefully, resolve any project / assignee names to GIDs via asana_search_objects first, then call asana_create_tasks with the resolved fields. Request: ${rest}`;
           break;
         default:
-          prompt = `The user typed "/asana ${trimmed}" with an unknown verb. Show the available verbs (me, my, show, project, search, status, comments, create) and ask what they want.`;
+          prompt = `The user typed "/asana ${trimmed}" with an unknown verb. Show the available verbs (me, my, show, project, search, status, comments, create, config, confirm) and ask what they want.`;
           break;
       }
 
       if (prompt) ctx.ui.setEditorText(prompt);
     },
   });
+}
+
+// Settings modal for /asana config. Single flag today, but the SettingsList
+// path scales if more flags are added later. Non-TUI callers get a status
+// notify instead (custom components are terminal-only).
+async function openConfigModal(
+  ctx: ExtensionCommandContext,
+): Promise<void> {
+  // Reads the live file-backed value, not pi.getFlag (which is in-memory only).
+  const currentOn = getConfirmWriteEnabled();
+
+  if (ctx.mode !== "tui") {
+    ctx.ui.notify(
+      `Asana write review: ${currentOn ? "on" : "off"}.\nToggle: /asana confirm on|off`,
+      "info",
+    );
+    return;
+  }
+
+  const items: SettingItem[] = [
+    {
+      id: CONFIRM_WRITE_FLAG,
+      label: "Confirm before posting writes",
+      description: CONFIRM_WRITE_FLAG_DESCRIPTION,
+      currentValue: currentOn ? "on" : "off",
+      values: ["on", "off"],
+    },
+  ];
+
+  const pending = new Map<string, boolean>();
+
+  await ctx.ui.custom((tui, theme, _kb, done) => {
+    const container = new Container();
+    container.addChild(
+      new Text(theme.fg("accent", theme.bold("Asana extension settings")), 1, 1),
+    );
+    const settingsList = new SettingsList(
+      items,
+      Math.min(items.length + 2, 15),
+      getSettingsListTheme(),
+      (_id: string, newValue: string) => {
+        pending.set(CONFIRM_WRITE_FLAG, newValue === "on");
+      },
+      () => done(undefined),
+    );
+    container.addChild(settingsList);
+    return {
+      render: (w: number) => container.render(w),
+      invalidate: () => container.invalidate(),
+      handleInput: (data: string) => {
+        settingsList.handleInput?.(data);
+        tui.requestRender();
+      },
+    };
+  });
+
+  // Drop net-zero flips, persist genuine deltas. File-backed setter applies
+  // live; no reload needed (the next write-tool call reads module state).
+  const target = pending.get(CONFIRM_WRITE_FLAG);
+  if (target === undefined || target === currentOn) return;
+  if (setConfirmWriteEnabled(target)) {
+    ctx.ui.notify(`${CONFIRM_WRITE_FLAG}: ${currentOn} → ${target ? "on" : "off"}.`, "info");
+  } else {
+    ctx.ui.notify(`Failed to persist ${CONFIRM_WRITE_FLAG} (disk write failed).`, "error");
+  }
 }
 
 export default asana;

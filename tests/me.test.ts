@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { invoke, firstText } from "./_helpers";
+import { invoke, firstText, makePi } from "./_helpers";
 
 beforeEach(() => {
   process.env.ASANA_ACCESS_TOKEN = "test-token";
@@ -71,7 +71,8 @@ describe("asana_add_comment", () => {
     } as unknown as Response);
     vi.stubGlobal("fetch", fetchMock);
 
-    const { addCommentTool } = await import("../lib/tools/comment");
+    const { createAddCommentTool } = await import("../lib/tools/comment");
+    const addCommentTool = createAddCommentTool(makePi());
     await invoke(addCommentTool, { task_gid: "t1", text: "hi" });
 
     const [, init] = fetchMock.mock.calls[0] as [unknown, RequestInit];
@@ -81,6 +82,8 @@ describe("asana_add_comment", () => {
     // Now with html=true
     fetchMock.mockClear();
     await invoke(addCommentTool, { task_gid: "t2", text: "<b>hi</b>", html: true });
+    // Note: addCommentTool above was built with makePi() (flag off), so the
+    // confirm gate is bypassed and these assertions exercise the POST path.
     const [, init2] = fetchMock.mock.calls[0] as [unknown, RequestInit];
     const body2 = JSON.parse(init2.body as string) as { data: Record<string, unknown> };
     expect(body2).toEqual({ data: { html_text: "<b>hi</b>" } });

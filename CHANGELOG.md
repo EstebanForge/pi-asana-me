@@ -1,5 +1,44 @@
 # Changelog
 
+## 1.2.0 — 2026-07-09
+
+### Added
+- Review-before-post gate on the three write tools (`asana_add_comment`,
+  `asana_create_tasks`, `asana_update_tasks`). When enabled (default), each
+  write prompts the user before hitting the Asana API:
+  - `asana_add_comment` opens the drafted comment in an editable preview —
+    trim the model's prose, then accept (Enter) or cancel (Esc). The posted
+    text is whatever you leave in the editor.
+  - `asana_create_tasks` / `asana_update_tasks` show a readable summary of
+    the batch and ask yes/no.
+  - In headless sessions (no interactive UI) the gate is skipped so
+    unsupervised runs are never deadlocked.
+- `/asana config` — settings modal (TUI) to toggle the review gate, or a
+  status line in non-interactive modes.
+- `/asana confirm on|off` — one-shot shorthand for the toggle.
+
+### Changed
+- The write tools were refactored from `export const` tool objects into
+  `createXTool(pi)` factories so the gate can read its toggle value at call
+  time. Tool behavior and parameters are otherwise unchanged.
+- The `/asana` tool guidance injected via `before_agent_start` now tells the
+  agent the review prompt is handled by the extension, so the agent should
+  call write tools directly rather than asking the user itself.
+
+### Fixed
+- Removed dead code in `asana_update_tasks` (an unused type alias and an
+  unreachable try/catch around the final result formatting).
+
+### Notes for integrators
+
+The gate value is persisted in `<piDir>/pi-asana.json` (`{ "confirmWrite":
+bool }`), where `<piDir>` is `process.env.PI_CODING_AGENT_DIR || ~/.pi/agent`.
+Pi's extension flags (`pi.registerFlag`) are in-memory only with no persistence
+path, so this extension owns its own tiny settings file rather than relying on
+`pi config set` (which does not touch flags). The `asana-confirm-write` flag is
+still registered for `/settings` visibility and the `--asana-confirm-write` CLI
+override, but the gate reads the JSON file.
+
 ## 1.1.0 — 2026-07-08
 
 ### Added

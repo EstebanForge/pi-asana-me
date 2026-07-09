@@ -1,6 +1,11 @@
 import { Type, type Static } from "typebox";
-import type { AgentToolResult, ToolDefinition } from "@earendil-works/pi-coding-agent";
+import type {
+  AgentToolResult,
+  ExtensionAPI,
+  ToolDefinition,
+} from "@earendil-works/pi-coding-agent";
 import { callAsana, AsanaError } from "../api";
+import { confirmWrite, summarizeCreateTasks } from "../confirm";
 import { toToolResult, errorText, type AsanaDetails } from "../result";
 import type { AsanaTaskCompact } from "../types";
 import {
@@ -12,7 +17,8 @@ import {
 
 // Batch task creation. Asana's REST `POST /tasks` creates one task per call,
 // so we honor the MCP "up to 50 per call" surface by looping client-side and
-// aggregating. Each task is created immediately, without a confirmation step.
+// aggregating. The whole batch is shown to the user for yes/no review before
+// the first POST when the `asana-confirm-write` flag is on.
 const TaskSpec = Type.Object({
   name: Type.Optional(Type.String()),
   notes: Type.Optional(Type.String()),
@@ -37,7 +43,10 @@ const Params = Type.Object({
   }),
 });
 
-export const createTasksTool: ToolDefinition<typeof Params, undefined> = {
+export function createCreateTasksTool(
+  pi: ExtensionAPI,
+): ToolDefinition<typeof Params, undefined> {
+  return {
   name: "asana_create_tasks",
   label: CREATE_TASKS_TITLE,
   description: CREATE_TASKS_DESCRIPTION,
@@ -45,7 +54,25 @@ export const createTasksTool: ToolDefinition<typeof Params, undefined> = {
   async execute(
     _toolCallId: string,
     params: Static<typeof Params>,
+    _signal,
+    _onUpdate,
+    ctx,
   ): Promise<AgentToolResult<AsanaDetails>> {
+    // Review-before-post gate (yes/no on a readable batch summary).
+    const decision = await confirmWrite(pi, ctx, {
+      title: `Create ${params.tasks.length} Asana task${
+        params.tasks.length === 1 ? "" : "s"
+      }?`,
+      summary: summarizeCreateTasks(params.workspace, params.tasks),
+    });
+    if (!decision.proceed) {
+      return toToolResult(
+        `Asana: task creation cancelled by user (${params.tasks.length} task${
+          params.tasks.length === 1 ? "" : "s"
+        }). Nothing was posted.`,
+      );
+    }
+
     try {
       const created: AsanaTaskCompact[] = [];
       const failures: Array<{ index: number; error: string }> = [];
@@ -112,4 +139,5 @@ export const createTasksTool: ToolDefinition<typeof Params, undefined> = {
       return toToolResult(errorText(err));
     }
   },
-};
+  };
+}

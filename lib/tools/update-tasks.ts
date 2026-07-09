@@ -1,7 +1,12 @@
 import { Type, type Static } from "typebox";
-import type { AgentToolResult, ToolDefinition } from "@earendil-works/pi-coding-agent";
-import { callAsana, AsanaError } from "../api";
-import { toToolResult, errorText, type AsanaDetails } from "../result";
+import type {
+  AgentToolResult,
+  ExtensionAPI,
+  ToolDefinition,
+} from "@earendil-works/pi-coding-agent";
+import { callAsana } from "../api";
+import { confirmWrite, summarizeUpdateTasks } from "../confirm";
+import { toToolResult, type AsanaDetails } from "../result";
 import type { AsanaTaskCompact } from "../types";
 import {
   UPDATE_TASKS_TITLE,
@@ -34,9 +39,10 @@ const Params = Type.Object({
   }),
 });
 
-type TaskUpdateInput = Static<typeof TaskUpdate>;
-
-export const updateTasksTool: ToolDefinition<typeof Params, undefined> = {
+export function createUpdateTasksTool(
+  pi: ExtensionAPI,
+): ToolDefinition<typeof Params, undefined> {
+  return {
   name: "asana_update_tasks",
   label: UPDATE_TASKS_TITLE,
   description: UPDATE_TASKS_DESCRIPTION,
@@ -44,7 +50,25 @@ export const updateTasksTool: ToolDefinition<typeof Params, undefined> = {
   async execute(
     _toolCallId: string,
     params: Static<typeof Params>,
+    _signal,
+    _onUpdate,
+    ctx,
   ): Promise<AgentToolResult<AsanaDetails>> {
+    // Review-before-post gate (yes/no on a readable change summary).
+    const decision = await confirmWrite(pi, ctx, {
+      title: `Update ${params.tasks.length} Asana task${
+        params.tasks.length === 1 ? "" : "s"
+      }?`,
+      summary: summarizeUpdateTasks(params.tasks),
+    });
+    if (!decision.proceed) {
+      return toToolResult(
+        `Asana: task update cancelled by user (${params.tasks.length} task${
+          params.tasks.length === 1 ? "" : "s"
+        }). Nothing was changed.`,
+      );
+    }
+
     const updated: AsanaTaskCompact[] = [];
     const failures: Array<{ gid: string; error: string }> = [];
 
@@ -95,16 +119,7 @@ export const updateTasksTool: ToolDefinition<typeof Params, undefined> = {
         lines.push(`- ${f.gid}: ${f.error}`);
       }
     }
-    void (0 as unknown as TaskUpdateInput); // appease unused-type linter without runtime cost
-    try {
-      return toToolResult(lines.join("\n"));
-    } catch (err) {
-      if (err instanceof AsanaError && err.status === 401) {
-        return toToolResult(
-          `Asana error: PAT cannot update tasks. ${err.message}`,
-        );
-      }
-      return toToolResult(errorText(err));
-    }
+    return toToolResult(lines.join("\n"));
   },
-};
+  };
+}

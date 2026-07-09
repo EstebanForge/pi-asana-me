@@ -31,9 +31,9 @@ import { getTaskDescriptionTool } from "../lib/tools/task-description";
 import { getTasksTool } from "../lib/tools/tasks";
 import { getProjectTool, getProjectsTool } from "../lib/tools/project";
 import { statusOverviewTool } from "../lib/tools/status";
-import { createCreateTasksTool } from "../lib/tools/create-tasks";
-import { createUpdateTasksTool } from "../lib/tools/update-tasks";
-import { createAddCommentTool } from "../lib/tools/comment";
+import { createTasksTool } from "../lib/tools/create-tasks";
+import { updateTasksTool } from "../lib/tools/update-tasks";
+import { addCommentTool } from "../lib/tools/comment";
 import { getTaskCommentsTool } from "../lib/tools/task-comments";
 import {
   CONFIRM_WRITE_FLAG,
@@ -78,9 +78,9 @@ function asana(pi: ExtensionAPI): void {
   pi.registerTool(getProjectTool);
   pi.registerTool(getProjectsTool);
   pi.registerTool(statusOverviewTool);
-  pi.registerTool(createCreateTasksTool(pi));
-  pi.registerTool(createUpdateTasksTool(pi));
-  pi.registerTool(createAddCommentTool(pi));
+  pi.registerTool(createTasksTool);
+  pi.registerTool(updateTasksTool);
+  pi.registerTool(addCommentTool);
   pi.registerTool(getTaskCommentsTool);
 
   pi.on("before_agent_start", async (event) => {

@@ -1,7 +1,6 @@
 import { Type, type Static } from "typebox";
 import type {
   AgentToolResult,
-  ExtensionAPI,
   ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import { callAsana, AsanaError } from "../api";
@@ -43,10 +42,7 @@ const Params = Type.Object({
   }),
 });
 
-export function createCreateTasksTool(
-  pi: ExtensionAPI,
-): ToolDefinition<typeof Params, undefined> {
-  return {
+export const createTasksTool: ToolDefinition<typeof Params, undefined> = {
   name: "asana_create_tasks",
   label: CREATE_TASKS_TITLE,
   description: CREATE_TASKS_DESCRIPTION,
@@ -59,7 +55,7 @@ export function createCreateTasksTool(
     ctx,
   ): Promise<AgentToolResult<AsanaDetails>> {
     // Review-before-post gate (yes/no on a readable batch summary).
-    const decision = await confirmWrite(pi, ctx, {
+    const decision = await confirmWrite(ctx, {
       title: `Create ${params.tasks.length} Asana task${
         params.tasks.length === 1 ? "" : "s"
       }?`,
@@ -139,5 +135,4 @@ export function createCreateTasksTool(
       return toToolResult(errorText(err));
     }
   },
-  };
-}
+};

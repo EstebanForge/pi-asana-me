@@ -1,7 +1,6 @@
 import { Type, type Static } from "typebox";
 import type {
   AgentToolResult,
-  ExtensionAPI,
   ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import { callAsana } from "../api";
@@ -39,10 +38,7 @@ const Params = Type.Object({
   }),
 });
 
-export function createUpdateTasksTool(
-  pi: ExtensionAPI,
-): ToolDefinition<typeof Params, undefined> {
-  return {
+export const updateTasksTool: ToolDefinition<typeof Params, undefined> = {
   name: "asana_update_tasks",
   label: UPDATE_TASKS_TITLE,
   description: UPDATE_TASKS_DESCRIPTION,
@@ -55,7 +51,7 @@ export function createUpdateTasksTool(
     ctx,
   ): Promise<AgentToolResult<AsanaDetails>> {
     // Review-before-post gate (yes/no on a readable change summary).
-    const decision = await confirmWrite(pi, ctx, {
+    const decision = await confirmWrite(ctx, {
       title: `Update ${params.tasks.length} Asana task${
         params.tasks.length === 1 ? "" : "s"
       }?`,
@@ -121,5 +117,4 @@ export function createUpdateTasksTool(
     }
     return toToolResult(lines.join("\n"));
   },
-  };
-}
+};

@@ -18,9 +18,11 @@
 - `/asana confirm on|off` — one-shot shorthand for the toggle.
 
 ### Changed
-- The write tools were refactored from `export const` tool objects into
-  `createXTool(pi)` factories so the gate can read its toggle value at call
-  time. Tool behavior and parameters are otherwise unchanged.
+- Write tools stay as flat `export const` tool objects, uniform with the read
+  tools. The confirm gate takes no `pi`: it never read `pi.getFlag` anyway
+  (flags are in-memory only with no setter), so an earlier factory form's `pi`
+  arg was vestigial. The gate reads file-backed state directly. Tool behavior
+  and parameters are otherwise unchanged.
 - The `/asana` tool guidance injected via `before_agent_start` now tells the
   agent the review prompt is handled by the extension, so the agent should
   call write tools directly rather than asking the user itself.

@@ -24,7 +24,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 /** Name of the persisted boolean flag that toggles the whole gate. */
 export const CONFIRM_WRITE_FLAG = "asana-confirm-write";
@@ -129,13 +128,12 @@ export interface ConfirmOutcome {
  * Resolve whether a write should proceed, prompting the user when the gate is
  * active and an interactive UI is present. Pure orchestration: no Asana I/O.
  *
- * `pi` is accepted for parity with the factory pattern but the gate reads its
- * own module state (file-backed) so it never depends on pi.getFlag. The
- * asana-confirm-write flag is still registered for /settings visibility and
- * CLI `--asana-confirm-write` override.
+ * The gate takes no ExtensionAPI on purpose: it never calls pi.getFlag (flags
+ * are in-memory only), so closing over `pi` would be dead weight. It reads its
+ * own file-backed module state instead. The asana-confirm-write flag is still
+ * registered for /settings visibility and CLI `--asana-confirm-write` override.
  */
 export async function confirmWrite(
-  _pi: ExtensionAPI,
   ctx: ConfirmContext,
   opts: ConfirmWriteOptions,
 ): Promise<ConfirmOutcome> {

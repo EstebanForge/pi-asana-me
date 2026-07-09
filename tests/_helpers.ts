@@ -7,7 +7,7 @@
 // This helper lets tests pass 2 or 3 args while satisfying the 5-arg type.
 // Equivalent to a per-call cast, extracted so the test bodies stay readable.
 
-import type { AgentToolResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { AgentToolResult } from "@earendil-works/pi-coding-agent";
 
 // Cast through `unknown` twice on purpose: the ToolDefinition's execute is a
 // 5-arg function whose first arg is `string`; declaring a compatible inline
@@ -38,14 +38,6 @@ export function invoke<P>(
     e: unknown,
   ) => Promise<AgentToolResult<unknown>>;
   return fn("call-id", params, undefined, undefined, ctx ?? NO_UI_CTX);
-}
-
-// Minimal pi stub for write-tool factories. The factory passes pi to
-// confirmWrite for parity, but the gate reads file-backed module state
-// (lib/confirm.ts getConfirmWriteEnabled), NOT pi.getFlag, so this stub's
-// flag value is irrelevant to the gate. Kept for signature compatibility.
-export function makePi(flagValue: boolean = false): ExtensionAPI {
-  return { getFlag: () => flagValue } as unknown as ExtensionAPI;
 }
 
 // Pull the rendered text out of an AgentToolResult. Empty string when the

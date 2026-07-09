@@ -2,7 +2,6 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { makePi } from "./_helpers";
 import {
   confirmWrite,
   summarizeCreateTasks,
@@ -46,7 +45,7 @@ describe("confirmWrite gate", () => {
   it("review disabled -> proceeds without touching UI (fast path)", async () => {
     setConfirmWriteEnabled(false);
     const { ctx, editor, confirm } = mockCtx({ editorResult: "x" });
-    const out = await confirmWrite(makePi(), ctx, {
+    const out = await confirmWrite(ctx, {
       title: "t",
       editableText: "draft",
       summary: "s",
@@ -60,7 +59,7 @@ describe("confirmWrite gate", () => {
   it("review enabled but no interactive UI -> proceeds (never blocks headless)", async () => {
     setConfirmWriteEnabled(true);
     const { ctx, editor, confirm } = mockCtx({ hasUI: false, editorResult: "x" });
-    const out = await confirmWrite(makePi(), ctx, {
+    const out = await confirmWrite(ctx, {
       title: "t",
       editableText: "draft",
       summary: "s",
@@ -73,7 +72,7 @@ describe("confirmWrite gate", () => {
   it("editable path: editor() accept returns the EDITED text", async () => {
     setConfirmWriteEnabled(true);
     const { ctx, editor, confirm } = mockCtx({ editorResult: "trimmed draft" });
-    const out = await confirmWrite(makePi(), ctx, {
+    const out = await confirmWrite(ctx, {
       title: "Post comment?",
       editableText: "verbose draft",
       summary: "s",
@@ -87,7 +86,7 @@ describe("confirmWrite gate", () => {
   it("editable path: editor() cancel (undefined) aborts the write", async () => {
     setConfirmWriteEnabled(true);
     const { ctx, editor, confirm } = mockCtx({ editorResult: undefined });
-    const out = await confirmWrite(makePi(), ctx, {
+    const out = await confirmWrite(ctx, {
       title: "t",
       editableText: "draft",
       summary: "s",
@@ -99,7 +98,7 @@ describe("confirmWrite gate", () => {
   it("non-editable path: confirm() true proceeds", async () => {
     setConfirmWriteEnabled(true);
     const { ctx, editor, confirm } = mockCtx({ confirmResult: true });
-    const out = await confirmWrite(makePi(), ctx, {
+    const out = await confirmWrite(ctx, {
       title: "Create 2 tasks?",
       summary: "tasks (2):\n  1. A",
     });
@@ -111,7 +110,7 @@ describe("confirmWrite gate", () => {
   it("non-editable path: confirm() false aborts", async () => {
     setConfirmWriteEnabled(true);
     const { ctx } = mockCtx({ confirmResult: false });
-    const out = await confirmWrite(makePi(), ctx, { title: "t", summary: "s" });
+    const out = await confirmWrite(ctx, { title: "t", summary: "s" });
     expect(out.proceed).toBe(false);
   });
 

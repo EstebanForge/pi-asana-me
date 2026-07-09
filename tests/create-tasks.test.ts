@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { invoke, firstText, makePi } from "./_helpers";
+import { invoke, firstText } from "./_helpers";
 
 beforeEach(() => {
   process.env.ASANA_ACCESS_TOKEN = "test-token";
@@ -27,8 +27,7 @@ describe("asana_create_tasks batch handling", () => {
       .mockResolvedValueOnce(postCreatedResponse("Task B", "2"));
     vi.stubGlobal("fetch", fetchMock);
 
-    const { createCreateTasksTool } = await import("../lib/tools/create-tasks");
-    const createTasksTool = createCreateTasksTool(makePi());
+    const { createTasksTool } = await import("../lib/tools/create-tasks");
     await invoke(createTasksTool, { tasks: [{ name: "Task A" }, { name: "Task B" }] });
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -43,8 +42,7 @@ describe("asana_create_tasks batch handling", () => {
     const fetchMock = vi.fn().mockResolvedValue(postCreatedResponse("ok", "1"));
     vi.stubGlobal("fetch", fetchMock);
 
-    const { createCreateTasksTool } = await import("../lib/tools/create-tasks");
-    const createTasksTool = createCreateTasksTool(makePi());
+    const { createTasksTool } = await import("../lib/tools/create-tasks");
     const text = firstText(
       await invoke(createTasksTool, {
         tasks: [
@@ -65,8 +63,7 @@ describe("asana_create_tasks batch handling", () => {
     const fetchMock = vi.fn().mockResolvedValue(postCreatedResponse("A", "1"));
     vi.stubGlobal("fetch", fetchMock);
 
-    const { createCreateTasksTool } = await import("../lib/tools/create-tasks");
-    const createTasksTool = createCreateTasksTool(makePi());
+    const { createTasksTool } = await import("../lib/tools/create-tasks");
     await invoke(createTasksTool, {
       workspace: "111",
       tasks: [{ name: "A", due_on: "2026-12-31" }],
@@ -91,8 +88,7 @@ describe("asana_create_tasks batch handling", () => {
       } as unknown as Response);
     vi.stubGlobal("fetch", fetchMock);
 
-    const { createCreateTasksTool } = await import("../lib/tools/create-tasks");
-    const createTasksTool = createCreateTasksTool(makePi());
+    const { createTasksTool } = await import("../lib/tools/create-tasks");
     const text = firstText(await invoke(createTasksTool, { tasks: [{ name: "A" }, { name: "B" }] }));
     expect(text).toContain("1 of 2 task");
     expect(text).toContain("Failures (1)");

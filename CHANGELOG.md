@@ -1,5 +1,38 @@
 # Changelog
 
+## 1.3.0 — 2026-07-20
+
+### Added
+- `asana_get_comment` &mdash; fetch the full, untruncated body of a single
+  comment (story) by its gid. `asana_get_task_comments` caps each comment at
+  700 chars and prints the story gid in the truncation footer; this tool
+  recovers the whole body on demand. Mirrors the
+  `asana_get_task` / `asana_get_task_description` pairing, now for comments.
+  Backed by `GET /stories/{story_gid}`.
+- `/asana comment <story gid>` slash command for direct single-comment fetch.
+
+### Changed
+- `asana_get_task_comments` truncation footer now names the recovery tool and
+  parameter (`call asana_get_comment with story_gid=...`) instead of the
+  generic `fetch story gid ... for full text`, so the agent has an actionable
+  next step instead of a dead end.
+- Comment truncation cap lowered from 800 to 700 chars (named const
+  `COMMENT_LIMIT` in `lib/tools/comment-list.ts`, mirroring `NOTES_LIMIT`
+  in `lib/tools/task.ts`).
+- `asana_get_task` notes cap docstring/guidance corrected: the CODE has
+  capped at 2000 chars since 1.1.0, but stale "~400 chars" lingered in the
+  TOOL_GUIDANCE system-prompt appendix, the README reach-for list, and the
+  `asana_get_task_description` docstring. Code wins; docs corrected to 2000.
+- Tool surface: 13 &rarr; 14 tools.
+- Renamed `lib/tools/comment.ts` &rarr; `comment-add.ts` and
+  `lib/tools/task-comments.ts` &rarr; `comment-list.ts` so the three comment
+  tools (`comment-add`, `comment-get`, `comment-list`) sort together.
+  Symbols and tool names unchanged; imports updated in `extensions/index.ts`
+  and the tests.
+- `asana_get_comment` now indents the comment body 2 spaces, matching the
+  list view in `asana_get_task_comments` so concatenated output reads
+  consistently.
+
 ## 1.2.1 — 2026-07-09
 
 ### Changed

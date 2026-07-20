@@ -1,13 +1,13 @@
 /**
  * pi-asana - Asana Work Graph tools for pi.
  *
- * Adds 13 LLM-callable tools that talk to the Asana REST API
+ * Adds 14 LLM-callable tools that talk to the Asana REST API
  * (https://app.asana.com/api/1.0) over plain HTTP+JSON. No MCP server install
  * is required: this extension issues standard REST calls with a personal
  * access token (PAT) read from the ASANA_ACCESS_TOKEN environment variable.
  *
  * The tool surface mirrors a curated subset of the official Asana MCP server
- * (https://developers.asana.com/docs/mcp-tools-reference). The 13 tools cover
+ * (https://developers.asana.com/docs/mcp-tools-reference). The 14 tools cover
  * the read-then-write flows an LLM agent actually needs; noisy duplicates and
  * Claude/ChatGPT-only confirmation-UI tools are intentionally omitted.
  *
@@ -33,8 +33,9 @@ import { getProjectTool, getProjectsTool } from "../lib/tools/project";
 import { statusOverviewTool } from "../lib/tools/status";
 import { createTasksTool } from "../lib/tools/create-tasks";
 import { updateTasksTool } from "../lib/tools/update-tasks";
-import { addCommentTool } from "../lib/tools/comment";
-import { getTaskCommentsTool } from "../lib/tools/task-comments";
+import { addCommentTool } from "../lib/tools/comment-add";
+import { getCommentTool } from "../lib/tools/comment-get";
+import { getTaskCommentsTool } from "../lib/tools/comment-list";
 import {
   CONFIRM_WRITE_FLAG,
   CONFIRM_WRITE_FLAG_DESCRIPTION,
@@ -50,9 +51,9 @@ const TOOL_GUIDANCE = [
   'Use asana_search_objects FIRST when you do not know a GID; pass a workspace from asana_get_me as "workspace".',
   "Use asana_get_my_tasks as the shortcut for the authenticated user\u2019s task list.",
   "Use asana_get_tasks with one of project/section/tag/assignee for bulk reads; asana_get_task for full detail on one task.",
-  "asana_get_task truncates the notes/description to ~400 chars; call asana_get_task_description for the full, untruncated body when you need the whole spec.",
+  "asana_get_task truncates the notes/description to 2000 chars; call asana_get_task_description for the full, untruncated body when you need the whole spec.",
   "Use asana_get_status_overview for cross-project rollups; do not chain a search before it.",
-  "Comments live on the stories endpoint, not the task; use asana_get_task_comments to read recent comment threads on demand (default: last 5).",
+  "Comments live on the stories endpoint, not the task; use asana_get_task_comments to read recent comment threads on demand (default: last 5). Long comments truncate at 700 chars; the footer prints the story_gid to pass to asana_get_comment for the full body.",
   "Write tools (asana_create_tasks, asana_update_tasks, asana_add_comment) prompt the user for review before posting to Asana when the `asana-confirm-write` flag is on (default). Call them directly: the extension shows the drafted payload for accept/edit/cancel. The agent does NOT need to ask the user itself.",
 ].join(" ");
 
@@ -82,6 +83,7 @@ function asana(pi: ExtensionAPI): void {
   pi.registerTool(updateTasksTool);
   pi.registerTool(addCommentTool);
   pi.registerTool(getTaskCommentsTool);
+  pi.registerTool(getCommentTool);
 
   pi.on("before_agent_start", async (event) => {
     return {
@@ -103,6 +105,7 @@ function asana(pi: ExtensionAPI): void {
   //                                  -> asana_search_objects
   //   /asana status <gids>            -> asana_get_status_overview
   //   /asana comments <gid> [N]       -> asana_get_task_comments
+  //   /asana comment <gid>            -> asana_get_comment
   //   /asana create <text>            -> hint with asana_create_tasks
   //   /asana config                   -> settings modal (write review gate)
   //   /asana confirm on|off           -> toggle write review gate
@@ -113,12 +116,12 @@ function asana(pi: ExtensionAPI): void {
   // to run; the agent picks the right tool from the prefill.
   pi.registerCommand("asana", {
     description:
-      'Asana tools. Usage: /asana me | /asana my [incomplete|completed] | /asana show <gid> | /asana project <gid> | /asana search <workspace> <query> | /asana status <gid> [<gid>...] | /asana comments <gid> [N] | /asana create <free-form description> | /asana config | /asana confirm on|off.',
+      'Asana tools. Usage: /asana me | /asana my [incomplete|completed] | /asana show <gid> | /asana project <gid> | /asana search <workspace> <query> | /asana status <gid> [<gid>...] | /asana comments <gid> [N] | /asana comment <gid> | /asana create <free-form description> | /asana config | /asana confirm on|off.',
     handler: async (args, ctx) => {
       const trimmed = args.trim();
       if (!trimmed) {
         ctx.ui.notify(
-          'Usage: /asana me | /asana my | /asana show <gid> | /asana project <gid> | /asana search <workspace> <query> | /asana status <gid>... | /asana comments <gid> [N] | /asana create <text> | /asana config | /asana confirm on|off',
+          'Usage: /asana me | /asana my | /asana show <gid> | /asana project <gid> | /asana search <workspace> <query> | /asana status <gid>... | /asana comments <gid> [N] | /asana comment <gid> | /asana create <text> | /asana config | /asana confirm on|off',
           "info",
         );
         return;
@@ -208,6 +211,19 @@ function asana(pi: ExtensionAPI): void {
           prompt = `Call the asana_get_task_comments tool with task_gid="${gid}"${limitNote} to fetch the most-recent comments on that task.`;
           break;
         }
+        case "comment": {
+          // /asana comment <story_gid>  -> full, untruncated single comment.
+          // Recover the body asana_get_task_comments truncated.
+          if (!/^\d+$/.test(rest)) {
+            ctx.ui.notify(
+              "Usage: /asana comment <story gid>\nExample: /asana comment 1234567890123456",
+              "warning",
+            );
+            return;
+          }
+          prompt = `Call the asana_get_comment tool with story_gid="${rest}" to fetch the full, untruncated text of that comment.`;
+          break;
+        }
         case "config": {
           // /asana config -> interactive settings modal (TUI) or status (else).
           // Mirrors the pi-glm-tweaks /glm-tweaks pattern: stage flips in the
@@ -239,7 +255,7 @@ function asana(pi: ExtensionAPI): void {
           prompt = `Help me create an Asana task. Read the user's request carefully, resolve any project / assignee names to GIDs via asana_search_objects first, then call asana_create_tasks with the resolved fields. Request: ${rest}`;
           break;
         default:
-          prompt = `The user typed "/asana ${trimmed}" with an unknown verb. Show the available verbs (me, my, show, project, search, status, comments, create, config, confirm) and ask what they want.`;
+          prompt = `The user typed "/asana ${trimmed}" with an unknown verb. Show the available verbs (me, my, show, project, search, status, comments, comment, create, config, confirm) and ask what they want.`;
           break;
       }
 

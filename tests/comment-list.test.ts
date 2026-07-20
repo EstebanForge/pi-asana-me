@@ -29,7 +29,7 @@ async function callComments(
   fetchMock = vi.fn(),
 ) {
   vi.stubGlobal("fetch", fetchMock);
-  const { getTaskCommentsTool } = await import("../lib/tools/task-comments");
+  const { getTaskCommentsTool } = await import("../lib/tools/comment-list");
   return { text: firstText(await invoke(getTaskCommentsTool, params)), fetchMock };
 }
 
@@ -81,7 +81,7 @@ describe("asana_get_task_comments", () => {
       },
     ];
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mkPage(data)));
-    const { getTaskCommentsTool } = await import("../lib/tools/task-comments");
+    const { getTaskCommentsTool } = await import("../lib/tools/comment-list");
     const text = firstText(await invoke(getTaskCommentsTool, { task_gid: "t" }));
     expect(text).toContain("2 of 2 comments");
     expect(text).toContain("Sarah MacLean");
@@ -116,7 +116,7 @@ describe("asana_get_task_comments", () => {
       },
     ];
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mkPage(data)));
-    const { getTaskCommentsTool } = await import("../lib/tools/task-comments");
+    const { getTaskCommentsTool } = await import("../lib/tools/comment-list");
     const text = firstText(
       await invoke(getTaskCommentsTool, { task_gid: "t", limit: 2 }),
     );
@@ -169,7 +169,7 @@ describe("asana_get_task_comments", () => {
       .mockResolvedValueOnce(mkPage(page2Data, null));
     vi.stubGlobal("fetch", fetchMock);
 
-    const { getTaskCommentsTool } = await import("../lib/tools/task-comments");
+    const { getTaskCommentsTool } = await import("../lib/tools/comment-list");
     const text = firstText(await invoke(getTaskCommentsTool, { task_gid: "t", limit: 5 }));
 
     // Two fetch calls: page 1 (with next token) + page 2 (terminating).
@@ -193,7 +193,7 @@ describe("asana_get_task_comments", () => {
       .mockResolvedValueOnce(mkPage([]));
     vi.stubGlobal("fetch", fetchMock);
 
-    const { getTaskCommentsTool } = await import("../lib/tools/task-comments");
+    const { getTaskCommentsTool } = await import("../lib/tools/comment-list");
     await invoke(getTaskCommentsTool, { task_gid: "t" });
 
     const [url1] = fetchMock.mock.calls[0] as [string];
@@ -220,7 +220,7 @@ describe("asana_get_task_comments", () => {
     const fetchMock = vi.fn().mockResolvedValue(mkPage(page, "next-token"));
     vi.stubGlobal("fetch", fetchMock);
 
-    const { getTaskCommentsTool } = await import("../lib/tools/task-comments");
+    const { getTaskCommentsTool } = await import("../lib/tools/comment-list");
     const text = firstText(
       await invoke(getTaskCommentsTool, { task_gid: "t", limit: 100 }),
     );
@@ -239,7 +239,7 @@ describe("asana_get_task_comments", () => {
       created_by: { gid: "u", name: "User" },
     }));
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mkPage(stories)));
-    const { getTaskCommentsTool } = await import("../lib/tools/task-comments");
+    const { getTaskCommentsTool } = await import("../lib/tools/comment-list");
     const text = firstText(
       await invoke(getTaskCommentsTool, { task_gid: "abc", limit: 3 }),
     );
@@ -264,7 +264,7 @@ describe("asana_get_task_comments", () => {
       },
     ];
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mkPage(data)));
-    const { getTaskCommentsTool } = await import("../lib/tools/task-comments");
+    const { getTaskCommentsTool } = await import("../lib/tools/comment-list");
     const text = firstText(
       await invoke(getTaskCommentsTool, { task_gid: "abc", limit: 1 }),
     );
@@ -272,7 +272,7 @@ describe("asana_get_task_comments", () => {
     expect(text).not.toContain("Mystery");
   });
 
-  it("truncates comments longer than 800 chars with a hint to fetch by GID", async () => {
+  it("truncates comments longer than 700 chars with a hint to fetch by GID", async () => {
     const data = [
       {
         gid: "long",
@@ -283,10 +283,10 @@ describe("asana_get_task_comments", () => {
       },
     ];
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mkPage(data)));
-    const { getTaskCommentsTool } = await import("../lib/tools/task-comments");
+    const { getTaskCommentsTool } = await import("../lib/tools/comment-list");
     const text = firstText(await invoke(getTaskCommentsTool, { task_gid: "abc" }));
-    expect(text).toContain("truncated at 800 chars");
-    expect(text).toContain("fetch story gid long");
+    expect(text).toContain("truncated at 700 chars");
+    expect(text).toContain("call asana_get_comment with story_gid=long");
     expect(text.length).toBeLessThan(2000 + 500);
   });
 
@@ -296,7 +296,7 @@ describe("asana_get_task_comments", () => {
       { gid: "ss2", type: "system", text: "assigned to X" },
     ];
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mkPage(data)));
-    const { getTaskCommentsTool } = await import("../lib/tools/task-comments");
+    const { getTaskCommentsTool } = await import("../lib/tools/comment-list");
     const text = firstText(await invoke(getTaskCommentsTool, { task_gid: "abc" }));
     expect(text).toContain("no comments on task abc");
     expect(text).toContain("2 system story/stories");

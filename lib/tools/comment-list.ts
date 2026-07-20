@@ -31,6 +31,12 @@ import {
 
 const MAX_PAGES = 10; // Asana documents ~1000-object truncation; 10 * 100 stays below.
 
+// Cap each rendered comment body. Lists with active threads get expensive
+// fast; this keeps the default payload readable. The footer names the
+// recovery tool + story_gid so the agent can pull the whole body on demand
+// via asana_get_comment. Mirrors the NOTES_LIMIT pattern in task.ts.
+const COMMENT_LIMIT = 700;
+
 interface ListPage<T> {
   data: T[];
   next_page?: { offset: string } | null;
@@ -125,14 +131,14 @@ export const getTaskCommentsTool: ToolDefinition<typeof Params, undefined> = {
         const when = c.created_at ?? "(no timestamp)";
         lines.push(`- ${author} at ${when} (story gid: ${c.gid})`);
         const body = c.text ?? c.html_text ?? "";
-        const truncated = body.length > 800;
-        const rendered = truncated ? body.slice(0, 800) : body;
+        const truncated = body.length > COMMENT_LIMIT;
+        const rendered = truncated ? body.slice(0, COMMENT_LIMIT) : body;
         if (rendered) {
           lines.push(rendered.split("\n").map((ln) => `  ${ln}`).join("\n"));
         }
         if (truncated) {
           lines.push(
-            `  ... (truncated at 800 chars; fetch story gid ${c.gid} for full text)`,
+            `  ... (truncated at ${COMMENT_LIMIT} chars; call asana_get_comment with story_gid=${c.gid} for the full text)`,
           );
         }
         lines.push("");

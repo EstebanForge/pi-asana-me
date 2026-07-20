@@ -71,7 +71,7 @@ describe("asana_add_comment", () => {
     } as unknown as Response);
     vi.stubGlobal("fetch", fetchMock);
 
-    const { addCommentTool } = await import("../lib/tools/comment");
+    const { addCommentTool } = await import("../lib/tools/comment-add");
     await invoke(addCommentTool, { task_gid: "t1", text: "hi" });
 
     const [, init] = fetchMock.mock.calls[0] as [unknown, RequestInit];

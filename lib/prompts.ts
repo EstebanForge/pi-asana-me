@@ -4,7 +4,9 @@
 // API reference. Rewritten so the pi agent knows exactly WHEN to reach for
 // each one and what the parameters map to.
 //
-// Curated set: 11 of the 27 official MCP tools. Skipped tools (with reason):
+// Curated set, not a 1:1 mirror of the official MCP server: we skip the
+// noisy/duplicate/UI-only MCP tools and add a few purpose-built recovery
+// tools (full-body fetches) the MCP set lacks. Skipped MCP tools (with reason):
 //   - search_tasks          (Premium-only; overlaps asana_search_objects)
 //   - get_portfolio(s)      (niche in agent flows)
 //   - get_items_for_portfolio (niche)
@@ -169,10 +171,22 @@ export const ADD_COMMENT_TEXT_DESCRIPTION =
 
 export const TASK_COMMENTS_TITLE = "Asana: Get Task Comments";
 
-export const TASK_COMMENTS_DESCRIPTION = `Get recent human comments on a task. Comments contain discussion/decisions NOT in description (excludes system events). Use when user asks about discussion or comments on a task. Not inlined in asana_get_task. Defaults to 5 newest (newest first). Long comments truncate at 800 chars. Filters by Asana's top-level \`type\` field (value "comment"); the \`resource_subtype\` field is an action verb like "comment_added" or "description_changed" and is NOT the discriminator.`;
+export const TASK_COMMENTS_DESCRIPTION = `Get recent human comments on a task. Comments contain discussion/decisions NOT in description (excludes system events). Use when user asks about discussion or comments on a task. Not inlined in asana_get_task. Defaults to 5 newest (newest first). Long comments truncate at 700 chars; the footer names the story_gid to pass to asana_get_comment for the full body. Filters by Asana's top-level \`type\` field (value "comment"); the \`resource_subtype\` field is an action verb like "comment_added" or "description_changed" and is NOT the discriminator.`;
 
 export const TASK_COMMENTS_TASK_GID_DESCRIPTION =
   "Task GID (e.g. \"1234567890123456\"). Get from workspace, search, or parent task.";
 
 export const TASK_COMMENTS_LIMIT_DESCRIPTION =
   "Count of recent comments to return (1-50). Defaults to 5.";
+
+// asana_get_comment: recover the full body of a single truncated comment.
+// asana_get_task_comments truncates each comment at 700 chars and prints
+// the story gid in the truncation footer; call THIS tool with that gid to
+// get the whole text. Mirrors the asana_get_task / asana_get_task_description
+// pairing for task notes.
+export const GET_COMMENT_TITLE = "Asana: Get Comment";
+
+export const GET_COMMENT_DESCRIPTION = `Full, untruncated text of a single comment (story). asana_get_task_comments truncates each comment at 700 chars and prints the story gid in the truncation footer; call THIS tool with that story_gid to read the whole body. Returns the comment with NO slice. Use AFTER you already have a story gid from asana_get_task_comments's output.`;
+
+export const GET_COMMENT_STORY_GID_DESCRIPTION =
+  "Story (comment) GID, e.g. \"1234567890123456\". Copy it from asana_get_task_comments output, where each comment is labeled \"(story gid: ...)\".";

@@ -9,7 +9,7 @@ import {
   GET_TASK_GID_DESCRIPTION,
 } from "../prompts";
 
-// asana_get_task deliberately truncates `notes` (~400 chars) to keep its
+// asana_get_task deliberately truncates `notes` (2000 chars) to keep its
 // default payload cheap; that cap hides the acceptance criteria, background,
 // and implementation detail an agent needs to actually DO the task. This tool
 // exists to recover the full body on demand: it asks only for name + notes,

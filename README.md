@@ -1,6 +1,6 @@
 # @estebanforge/pi-asana
 
-Asana Work Graph tool for the [pi coding agent](https://pi.dev). Adds 13 LLM-callable tools (asana_*) that query the Asana REST API over plain HTTP, mirroring a curated subset of the official Asana MCP tool set &mdash; **no MCP server install required**.
+Asana Work Graph tool for the [pi coding agent](https://pi.dev). Adds 14 LLM-callable tools (asana_*) that query the Asana REST API over plain HTTP, mirroring a curated subset of the official Asana MCP tool set &mdash; **no MCP server install required**.
 
 ## Install
 
@@ -18,6 +18,7 @@ pi install npm:@estebanforge/pi-asana
 | `asana_get_task` | Full detail for one task (notes truncated ~2000 chars) |
 | `asana_get_task_description` | Full, untruncated notes/description for one task. Use when `asana_get_task`'s truncation marker fires. |
 | `asana_get_task_comments` | Most-recent human comments on a task (default: last 5, max 50). On-demand. |
+| `asana_get_comment` | Full, untruncated text of one comment (story). Use when `asana_get_task_comments`'s 700-char truncation marker fires. |
 | `asana_get_project` | Full detail for one project (sections optional) |
 | `asana_get_projects` | List projects in a workspace or team |
 | `asana_get_status_overview` | Aggregated status report across projects |
@@ -97,6 +98,7 @@ Slash command (pinned intent): `/asana <verb>` prefills the editor with an expli
 | `/asana search <workspace> <query>` | asana_search_objects (defaults to resource_type=task) |
 | `/asana status <gid>...` | asana_get_status_overview |
 | `/asana comments <gid> [N]` | asana_get_task_comments (last N comments; default 5) |
+| `/asana comment <gid>` | asana_get_comment (full text of one comment) |
 | `/asana create <text>` | asana_create_tasks |
 | `/asana config` | Toggle the write review gate (settings modal in TUI) |
 | `/asana confirm on\|off` | Toggle the write review gate (one-shot) |
@@ -112,10 +114,11 @@ Reach for them in this order:
 3. `asana_get_my_tasks` &mdash; shortcut for "what is on my plate".
 4. `asana_get_tasks` / `asana_get_project(s)` &mdash; bulk read scoped to a project / section / tag / assignee.
 5. `asana_get_task` &mdash; full detail on one task.
-6. `asana_get_task_description` &mdash; the full, untruncated task notes/description. `asana_get_task` truncates notes to ~400 chars and prints a marker; reach for this when you need the whole body (acceptance criteria, background, implementation notes).
+6. `asana_get_task_description` &mdash; the full, untruncated task notes/description. `asana_get_task` truncates notes to 2000 chars and prints a marker; reach for this when you need the whole body (acceptance criteria, background, implementation notes).
 7. `asana_get_status_overview` &mdash; aggregated status report (do not chain a search before it).
-8. `asana_get_task_comments` &mdash; clarifications and reviewer threads live in comments, not in `notes`. Pull on demand when the task context is a conversation, not a record.
-9. Write tools (`create_tasks`, `update_tasks`, `add_comment`) &mdash; only after you have the IDs. The extension shows the drafted payload for accept/edit/cancel; you do not need to ask the user first.
+8. `asana_get_task_comments` &mdash; clarifications and reviewer threads live in comments, not in `notes`. Pull on demand when the task context is a conversation, not a record. Each comment truncates at 700 chars; the footer names the `story_gid` to pass to `asana_get_comment`.
+9. `asana_get_comment` &mdash; the full, untruncated body of a single comment. Reach for it when a comment's truncation marker fired and that comment is the work (a decision, a Q&A, a spec).
+10. Write tools (`create_tasks`, `update_tasks`, `add_comment`) &mdash; only after you have the IDs. The extension shows the drafted payload for accept/edit/cancel; you do not need to ask the user first.
 
 ## Notes
 
@@ -123,7 +126,7 @@ Reach for them in this order:
 - The typeahead endpoint (`asana_search_objects`) accepts only ONE resource type per call (single enum `task` / `project` / `user` / `tag`); it does not accept a CSV. Call the tool once per type to fan out across types.
 - The `/tasks` endpoint requires either project/section/tag, OR (assignee AND workspace). `asana_get_my_tasks` enforces this by making `workspace` a required parameter.
 - Asana enforces rate limits (~150 req/min per PAT). A 429 response surfaces a clear retry message.
-- The 13-tool surface omits several official MCP tools that did not age well in an LLM agent context: interactive `*_preview` tools (Claude/ChatGPT-only confirmation UI), `get_attachments` (binary blobs), `search_tasks` (Premium-only; overlaps `search_objects`), `get_portfolio*` (niche), `get_agent*` (AI Teammates only), and `delete_task` (destructive &mdash; add on request).
+- The 14-tool surface omits several official MCP tools that did not age well in an LLM agent context: interactive `*_preview` tools (Claude/ChatGPT-only confirmation UI), `get_attachments` (binary blobs), `search_tasks` (Premium-only; overlaps `search_objects`), `get_portfolio*` (niche), `get_agent*` (AI Teammates only), and `delete_task` (destructive &mdash; add on request).
 - Do not pass secrets or PII in `notes` or `text` arguments to write tools &mdash; they land in your Asana workspace directly.
 
 ## License

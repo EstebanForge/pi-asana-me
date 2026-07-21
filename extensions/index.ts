@@ -226,11 +226,9 @@ function asana(pi: ExtensionAPI): void {
         }
         case "config": {
           // /asana config -> interactive settings modal (TUI) or status (else).
-          // Mirrors the pi-glm-tweaks /glm-tweaks pattern: stage flips in the
-          // SettingsList, persist genuine deltas via `pi config set`, then a
-          // single reload so the in-memory flag value (read by the write tools
-          // via pi.getFlag) picks up the change. ctx is stale after reload,
-          // so we notify first and reload last.
+          // File-backed (lib/confirm.ts): stages flips in the SettingsList, then
+          // persists genuine deltas via setConfirmWriteEnabled — applies live,
+          // no reload needed (the next write-tool call reads module state).
           await openConfigModal(ctx);
           return;
         }

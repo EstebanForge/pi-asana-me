@@ -6,6 +6,7 @@ import {
   confirmWrite,
   summarizeCreateTasks,
   summarizeUpdateTasks,
+  willPromptForWrite,
   setConfirmWriteEnabled,
   getConfirmWriteEnabled,
   getSettingsPath,
@@ -172,6 +173,14 @@ describe("summarizeCreateTasks", () => {
     expect(s).toContain("2. B  |  project=p1  |  section=s1");
   });
 
+  it("renders a resolved parent as name + URL so subtask landings are readable", () => {
+    const resolved = new Map([
+      ["999", { name: "Epic: Auth", permalink_url: "https://app.asana.com/0/1/999" }],
+    ]);
+    const s = summarizeCreateTasks(undefined, [{ name: "Sub", parent: "999" }], resolved);
+    expect(s).toContain("1. Sub  |  parent='Epic: Auth' (https://app.asana.com/0/1/999)");
+  });
+
   it("caps the preview at 10 tasks", () => {
     const tasks = Array.from({ length: 15 }, (_, i) => ({ name: `T${i}` }));
     const s = summarizeCreateTasks(undefined, tasks);
@@ -193,7 +202,38 @@ describe("summarizeUpdateTasks", () => {
       { gid: "222", name: "Renamed", assignee: "me", due_on: "2026-01-01" },
     ]);
     expect(s).toContain("updates (2):");
-    expect(s).toContain("1. gid=111  |  complete");
-    expect(s).toContain('2. gid=222  |  name="Renamed"  |  assignee=me  |  due=2026-01-01');
+    expect(s).toContain("1. gid: 111  |  complete");
+    expect(s).toContain('2. gid: 222  |  name="Renamed"  |  assignee=me  |  due=2026-01-01');
+  });
+
+  it("renders resolved task name + URL and resolves parent refs", () => {
+    const resolved = new Map([
+      ["111", { name: "Fix login", permalink_url: "https://app.asana.com/0/1/111" }],
+      ["999", { name: "Epic: Auth", permalink_url: "https://app.asana.com/0/1/999" }],
+    ]);
+    const s = summarizeUpdateTasks([{ gid: "111", completed: true, parent: "999" }], resolved);
+    expect(s).toContain("'Fix login' (https://app.asana.com/0/1/111)  |  complete");
+    expect(s).toContain("parent='Epic: Auth' (https://app.asana.com/0/1/999)");
+  });
+
+  it("falls back to gid when name resolves but URL is missing", () => {
+    const s = summarizeUpdateTasks(
+      [{ gid: "111", completed: true }],
+      new Map([["111", { name: "Fix login" }]]),
+    );
+    expect(s).toContain("'Fix login' (gid: 111)  |  complete");
+  });
+});
+
+describe("willPromptForWrite", () => {
+  it("is true only when the gate is on AND ctx has an interactive UI", () => {
+    const withUi = { hasUI: true };
+    const noUi = { hasUI: false };
+    setConfirmWriteEnabled(true);
+    expect(willPromptForWrite(withUi)).toBe(true);
+    expect(willPromptForWrite(noUi)).toBe(false);
+    setConfirmWriteEnabled(false);
+    expect(willPromptForWrite(withUi)).toBe(false);
+    expect(willPromptForWrite(noUi)).toBe(false);
   });
 });

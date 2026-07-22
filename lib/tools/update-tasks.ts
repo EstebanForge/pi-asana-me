@@ -4,7 +4,8 @@ import type {
   ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import { callAsana } from "../api";
-import { confirmWrite, summarizeUpdateTasks } from "../confirm";
+import { confirmWrite, summarizeUpdateTasks, willPromptForWrite } from "../confirm";
+import { resolveTasks } from "../resolve";
 import { toToolResult, type AsanaDetails } from "../result";
 import type { AsanaTaskCompact } from "../types";
 import {
@@ -51,11 +52,19 @@ export const updateTasksTool: ToolDefinition<typeof Params, undefined> = {
     ctx,
   ): Promise<AgentToolResult<AsanaDetails>> {
     // Review-before-post gate (yes/no on a readable change summary).
+    // Resolve task + parent GIDs to names + URLs so the human sees what they
+    // are about to change, not bare GIDs. Skipped on the fast paths.
+    const parentGids = params.tasks
+      .map((t) => t.parent)
+      .filter((p): p is string => !!p);
+    const resolved = willPromptForWrite(ctx)
+      ? await resolveTasks([...params.tasks.map((t) => t.gid), ...parentGids])
+      : undefined;
     const decision = await confirmWrite(ctx, {
       title: `Update ${params.tasks.length} Asana task${
         params.tasks.length === 1 ? "" : "s"
       }?`,
-      summary: summarizeUpdateTasks(params.tasks),
+      summary: summarizeUpdateTasks(params.tasks, resolved),
     });
     if (!decision.proceed) {
       return toToolResult(

@@ -49,9 +49,10 @@ If the environment variable is missing, every tool returns a single error messag
 
 The three write tools (`asana_add_comment`, `asana_create_tasks`, `asana_update_tasks`) prompt you for review before posting:
 
-- **Comments** open in an editable preview &mdash; trim the model's prose, then accept (Enter) or cancel (Esc). The posted text is whatever you leave in the editor.
-- **Task batches** show a readable summary and ask yes/no.
-- In **headless** sessions (no interactive UI) the gate is skipped so unsupervised runs never deadlock.
+- **Comments** open in an editable preview &mdash; trim the model's prose, then accept (Enter) or cancel (Esc). The posted text is whatever you leave in the editor. The dialog title shows the target task's **name and Asana URL**, not just its GID.
+- **Task batches** show a readable summary and ask yes/no. Each task (and its `parent`, where set) renders as `'Name' (url)` when resolvable.
+- Summaries resolve GIDs to names + URLs best-effort; any GID that can't be resolved falls back to `gid: <gid>`, so nothing ever blocks on a lookup miss.
+- In **headless** sessions (no interactive UI) the gate is skipped so unsupervised runs never deadlock, and no extra lookups are issued.
 
 Toggle it:
 

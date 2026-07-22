@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.4.0 — 2026-07-21
+
+### Changed
+- The write-review confirm dialogs now show the task **name and permalink
+  URL** instead of a bare GID, so a human can see exactly where a write will
+  land before approving it:
+  - `asana_add_comment` title reads `Post comment to 'Fix login'
+    (https://app.asana.com/0/…/…)?` instead of `… task 1234567890123456?`.
+  - `asana_update_tasks` renders each task (and its `parent`) as
+    `'Name' (url)` in the yes/no summary.
+  - `asana_create_tasks` resolves a subtask's `parent` the same way (new
+    tasks have no URL of their own yet; the parent is where they land).
+  - Any GID that fails to resolve (deleted task, no access, transient error)
+  falls back to `gid: <gid>`, so a resolve miss never blocks a write.
+  Backed by a new `lib/resolve.ts` (`resolveTasks` + `fmtTask`).
+- Resolution runs **only when a prompt will actually be shown** — the new
+  `willPromptForWrite(ctx)` helper gates the extra `GET /tasks/{gid}` calls,
+  so the headless (`hasUI:false`) and gate-off fast paths are unchanged and
+  pay nothing. `confirmWrite` itself stays pure (no Asana I/O).
+
 ## 1.3.0 — 2026-07-20
 
 ### Added

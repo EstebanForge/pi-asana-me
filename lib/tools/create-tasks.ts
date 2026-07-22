@@ -4,7 +4,8 @@ import type {
   ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import { callAsana, AsanaError } from "../api";
-import { confirmWrite, summarizeCreateTasks } from "../confirm";
+import { confirmWrite, summarizeCreateTasks, willPromptForWrite } from "../confirm";
+import { resolveTasks } from "../resolve";
 import { toToolResult, errorText, type AsanaDetails } from "../result";
 import type { AsanaTaskCompact } from "../types";
 import {
@@ -54,12 +55,18 @@ export const createTasksTool: ToolDefinition<typeof Params, undefined> = {
     _onUpdate,
     ctx,
   ): Promise<AgentToolResult<AsanaDetails>> {
-    // Review-before-post gate (yes/no on a readable batch summary).
+    // Review-before-post gate (yes/no on a readable batch summary). New
+    // tasks have no URL yet, but a subtask's `parent` is an existing task —
+    // resolve those so the human sees where the subtasks will land.
+    const parentGids = params.tasks
+      .map((t) => t.parent)
+      .filter((p): p is string => !!p);
+    const resolved = willPromptForWrite(ctx) ? await resolveTasks(parentGids) : undefined;
     const decision = await confirmWrite(ctx, {
       title: `Create ${params.tasks.length} Asana task${
         params.tasks.length === 1 ? "" : "s"
       }?`,
-      summary: summarizeCreateTasks(params.workspace, params.tasks),
+      summary: summarizeCreateTasks(params.workspace, params.tasks, resolved),
     });
     if (!decision.proceed) {
       return toToolResult(

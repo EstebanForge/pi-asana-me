@@ -4,7 +4,8 @@ import type {
   ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import { callAsana, AsanaError } from "../api";
-import { confirmWrite } from "../confirm";
+import { confirmWrite, willPromptForWrite } from "../confirm";
+import { resolveTasks, fmtTask } from "../resolve";
 import { toToolResult, errorText, type AsanaDetails } from "../result";
 import type { AsanaStory } from "../types";
 import {
@@ -36,9 +37,16 @@ export const addCommentTool: ToolDefinition<typeof Params, undefined> = {
     ctx,
   ): Promise<AgentToolResult<AsanaDetails>> {
     // Review-before-post gate. The editable path lets the user trim the
-    // model's prose; Esc cancels the whole write.
+    // model's prose; Esc cancels the whole write. Resolve the task to a
+    // readable label only when a prompt will actually be shown, so the
+    // headless / gate-off fast paths skip the extra GET.
+    let title = `Post comment to task ${params.task_gid}?`;
+    if (willPromptForWrite(ctx)) {
+      const resolved = await resolveTasks([params.task_gid]);
+      title = `Post comment to ${fmtTask(params.task_gid, resolved.get(params.task_gid))}?`;
+    }
     const decision = await confirmWrite(ctx, {
-      title: `Post comment to task ${params.task_gid}?`,
+      title,
       editableText: params.text,
       summary: params.text,
     });

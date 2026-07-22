@@ -24,6 +24,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { fmtTask, type ResolvedRef } from "./resolve";
 
 /** Name of the persisted boolean flag that toggles the whole gate. */
 export const CONFIRM_WRITE_FLAG = "asana-confirm-write";
@@ -73,6 +74,17 @@ function loadFromDisk(): boolean {
 /** Current live value of the gate (read from disk each call). */
 export function getConfirmWriteEnabled(): boolean {
   return loadFromDisk();
+}
+
+/**
+ * True when the gate would actually show a prompt (gate on AND interactive UI).
+ * Lets write tools skip best-effort GID resolution (extra API calls) on the
+ * headless / gate-off fast paths, where no human ever sees the summary.
+ * Mirrors the two short-circuit checks inside confirmWrite, against the same
+ * source of truth (file-backed gate + ctx.hasUI).
+ */
+export function willPromptForWrite(ctx: { hasUI: boolean }): boolean {
+  return getConfirmWriteEnabled() && ctx.hasUI;
 }
 
 /**
@@ -179,6 +191,7 @@ export function summarizeCreateTasks(
     section?: string;
     parent?: string;
   }>,
+  resolved?: Map<string, ResolvedRef>,
 ): string {
   const lines: string[] = [];
   if (workspace) lines.push(`workspace: ${workspace}`);
@@ -189,7 +202,8 @@ export function summarizeCreateTasks(
     const project = firstProject(t);
     if (project !== undefined) parts.push(`project=${project}`);
     if (t.section !== undefined) parts.push(`section=${t.section}`);
-    if (t.parent !== undefined) parts.push(`parent=${t.parent}`);
+    if (t.parent !== undefined)
+      parts.push(`parent=${fmtTask(t.parent, resolved?.get(t.parent))}`);
     if (t.assignee !== undefined) parts.push(`assignee=${t.assignee}`);
     if (t.due_on !== undefined) parts.push(`due=${t.due_on}`);
     lines.push(`  ${i + 1}. ${parts.join("  |  ")}`);
@@ -210,17 +224,19 @@ export function summarizeUpdateTasks(
     parent?: string;
     projects?: string[];
   }>,
+  resolved?: Map<string, ResolvedRef>,
 ): string {
   const lines: string[] = [`updates (${tasks.length}):`];
   const shown = tasks.slice(0, PREVIEW_CAP);
   shown.forEach((t, i) => {
-    const parts: string[] = [`gid=${t.gid}`];
+    const parts: string[] = [fmtTask(t.gid, resolved?.get(t.gid))];
     if (t.name !== undefined) parts.push(`name="${t.name}"`);
     if (t.completed !== undefined) parts.push(t.completed ? "complete" : "reopen");
     if (t.assignee !== undefined) parts.push(`assignee=${t.assignee}`);
     if (t.due_on !== undefined) parts.push(`due=${t.due_on}`);
     if (t.section !== undefined) parts.push(`section=${t.section}`);
-    if (t.parent !== undefined) parts.push(`parent=${t.parent}`);
+    if (t.parent !== undefined)
+      parts.push(`parent=${fmtTask(t.parent, resolved?.get(t.parent))}`);
     if (t.projects !== undefined) parts.push(`projects=${t.projects.join(",")}`);
     lines.push(`  ${i + 1}. ${parts.join("  |  ")}`);
   });

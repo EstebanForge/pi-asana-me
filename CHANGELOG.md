@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.4.1 — 2026-07-29
+
+### Changed
+- `asana_add_comment` success summary now appends the task **permalink URL**
+  (`URL: https://app.asana.com/0/…/…`) after the story gid, so the agent's
+  recap carries a clickable link to where the comment landed. The confirm
+  dialog already resolved the task for its title; the tool now reuses that
+  resolved ref and falls back to one `GET /tasks/{gid}` in the headless /
+  gate-off fast path. A resolve miss (deleted task, no access) omits the URL
+  rather than failing the post. No trailing punctuation on the URL so it
+  survives copy-paste.
+- New `tests/comment-add.test.ts` locks the URL-present and URL-omitted
+  contracts.
+
 ## 1.4.0 — 2026-07-21
 
 ### Changed

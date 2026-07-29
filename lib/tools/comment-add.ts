@@ -5,7 +5,7 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { callAsana, AsanaError } from "../api";
 import { confirmWrite, willPromptForWrite } from "../confirm";
-import { resolveTasks, fmtTask } from "../resolve";
+import { resolveTasks, fmtTask, type ResolvedRef } from "../resolve";
 import { toToolResult, errorText, type AsanaDetails } from "../result";
 import type { AsanaStory } from "../types";
 import {
@@ -37,12 +37,15 @@ export const addCommentTool: ToolDefinition<typeof Params, undefined> = {
     ctx,
   ): Promise<AgentToolResult<AsanaDetails>> {
     // Review-before-post gate. The editable path lets the user trim the
-    // model's prose; Esc cancels the whole write. Resolve the task to a
-    // readable label only when a prompt will actually be shown, so the
-    // headless / gate-off fast paths skip the extra GET.
+    // model's prose; Esc cancels the whole write. We also resolve the task
+    // once up front so the confirm title AND the success summary can show a
+    // clickable task URL. resolveTasks only fires when a prompt will actually
+    // be shown (gate on + interactive UI); the headless / gate-off fast path
+    // defers the lookup to after a successful post.
+    let resolved: Map<string, ResolvedRef> | undefined;
     let title = `Post comment to task ${params.task_gid}?`;
     if (willPromptForWrite(ctx)) {
-      const resolved = await resolveTasks([params.task_gid]);
+      resolved = await resolveTasks([params.task_gid]);
       title = `Post comment to ${fmtTask(params.task_gid, resolved.get(params.task_gid))}?`;
     }
     const decision = await confirmWrite(ctx, {
@@ -67,10 +70,21 @@ export const addCommentTool: ToolDefinition<typeof Params, undefined> = {
           body,
         },
       );
+      // Best-effort task permalink so the agent can cite a clickable URL in
+      // its recap. Reuse the pre-prompt resolve when present; otherwise fetch
+      // once. resolveTasks swallows per-GID failures, so a miss just omits the
+      // URL rather than failing an otherwise-successful post.
+      let permalink = resolved?.get(params.task_gid)?.permalink_url;
+      if (!permalink) {
+        permalink = (await resolveTasks([params.task_gid])).get(
+          params.task_gid,
+        )?.permalink_url;
+      }
+      const urlPart = permalink ? ` URL: ${permalink}` : "";
       return toToolResult(
         `Asana: comment added to task ${params.task_gid} (story gid: ${story.gid}, at ${
           story.created_at ?? "(no timestamp)"
-        }).`,
+        }).${urlPart}`,
       );
     } catch (err) {
       if (err instanceof AsanaError && err.status === 404) {

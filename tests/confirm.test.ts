@@ -14,7 +14,7 @@ import {
   type ConfirmContext,
 } from "../lib/confirm";
 
-// The gate reads file-backed module state at <piDir>/pi-asana.json. Redirect
+// The gate reads file-backed module state at <piDir>/pi-asana-me.json. Redirect
 // PI_CODING_AGENT_DIR to a per-test tmp dir so tests never touch the real
 // ~/.pi/agent and start from a known (no-file -> default ON) state. Each test
 // also clears the module cache via setConfirmWriteEnabled so cached state
@@ -22,7 +22,7 @@ import {
 let tmpDir: string;
 
 beforeEach(() => {
-  tmpDir = mkdtempSync(join(tmpdir(), "pi-asana-test-"));
+  tmpDir = mkdtempSync(join(tmpdir(), "pi-asana-me-test-"));
   process.env.PI_CODING_AGENT_DIR = tmpDir;
 });
 
@@ -157,7 +157,7 @@ describe("persistence (file-backed state)", () => {
   });
 
   it("settings path lives under PI_CODING_AGENT_DIR", () => {
-    expect(getSettingsPath()).toBe(join(tmpDir, "pi-asana.json"));
+    expect(getSettingsPath()).toBe(join(tmpDir, "pi-asana-me.json"));
   });
 });
 

@@ -1,5 +1,5 @@
 /**
- * pi-asana - Asana Work Graph tools for pi.
+ * pi-asana-me - Asana Work Graph tools for pi.
  *
  * Adds 14 LLM-callable tools that talk to the Asana REST API
  * (https://app.asana.com/api/1.0) over plain HTTP+JSON. No MCP server install

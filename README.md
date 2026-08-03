@@ -1,11 +1,11 @@
-# @estebanforge/pi-asana
+# @estebanforge/pi-asana-me
 
 Asana Work Graph tool for the [pi coding agent](https://pi.dev). Adds 14 LLM-callable tools (asana_*) that query the Asana REST API over plain HTTP, mirroring a curated subset of the official Asana MCP tool set &mdash; **no MCP server install required**.
 
 ## Install
 
 ```bash
-pi install npm:@estebanforge/pi-asana
+pi install npm:@estebanforge/pi-asana-me
 ```
 
 ## What it adds
@@ -61,7 +61,7 @@ Toggle it:
 | `/asana config` | Settings modal (TUI) to toggle the gate; status line elsewhere. |
 | `/asana confirm on` / `/asana confirm off` | One-shot toggle. |
 
-The value is persisted in `<piDir>/pi-asana.json` (`{ "confirmWrite": bool }`), where `<piDir>` is `process.env.PI_CODING_AGENT_DIR || ~/.pi/agent`. The `asana-confirm-write` flag is also registered for `/settings` visibility and the `--asana-confirm-write` CLI override, but the gate reads the JSON file.
+The value is persisted in `<piDir>/pi-asana-me.json` (`{ "confirmWrite": bool }`), where `<piDir>` is `process.env.PI_CODING_AGENT_DIR || ~/.pi/agent`. The `asana-confirm-write` flag is also registered for `/settings` visibility and the `--asana-confirm-write` CLI override, but the gate reads the JSON file.
 
 ## Usage
 

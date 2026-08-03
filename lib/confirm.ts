@@ -16,7 +16,7 @@
 // PERSISTENCE: pi's extension flags (pi.registerFlag) are in-memory only, seeded
 // from `default` and CLI `--flag-name` args at process start. There is no
 // setFlag on ExtensionAPI and `pi config set <flag>` does NOT touch flags. So we
-// own a tiny settings file at <piDir>/pi-asana.json ({ confirmWrite: bool }),
+// own a tiny settings file at <piDir>/pi-asana-me.json ({ confirmWrite: bool }),
 // hydrate module-level state from it at load, and write through on toggle. This
 // keeps the value live across the session without a reload, and durable across
 // restarts. `piDir` = process.env.PI_CODING_AGENT_DIR || ~/.pi/agent.
@@ -32,7 +32,7 @@ export const CONFIRM_WRITE_FLAG = "asana-confirm-write";
 export const CONFIRM_WRITE_FLAG_DESCRIPTION =
   "When on (default), asana_add_comment / asana_create_tasks / asana_update_tasks prompt for review before posting to Asana. Comments open an editable preview; task batches ask yes/no. Turn off to post without confirmation. Toggle via /asana config or /asana confirm on|off.";
 
-const SETTINGS_FILENAME = "pi-asana.json";
+const SETTINGS_FILENAME = "pi-asana-me.json";
 const DEFAULT_CONFIRM_WRITE = true;
 
 // Resolve the agent config dir the same way pi does (dist/config.js getAgentDir):
@@ -88,7 +88,7 @@ export function willPromptForWrite(ctx: { hasUI: boolean }): boolean {
 }
 
 /**
- * Persist + apply a new gate value. Writes through to <piDir>/pi-asana.json and
+ * Persist + apply a new gate value. Writes through to <piDir>/pi-asana-me.json and
  * updates live state synchronously, so the next write-tool call sees the new
  * value immediately (no reload required). Returns true on success.
  */

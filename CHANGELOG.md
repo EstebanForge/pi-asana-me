@@ -112,7 +112,7 @@
 
 ### Notes for integrators
 
-The gate value is persisted in `<piDir>/pi-asana.json` (`{ "confirmWrite":
+The gate value is persisted in `<piDir>/pi-asana-me.json` (`{ "confirmWrite":
 bool }`), where `<piDir>` is `process.env.PI_CODING_AGENT_DIR || ~/.pi/agent`.
 Pi's extension flags (`pi.registerFlag`) are in-memory only with no persistence
 path, so this extension owns its own tiny settings file rather than relying on

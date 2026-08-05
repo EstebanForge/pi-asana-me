@@ -1,5 +1,61 @@
 # Changelog
 
+## 1.5.0 — 2026-08-05
+
+### Added
+- `asana_list_attachments` &mdash; list the files and images attached to a task.
+  Returns metadata only (gid, name, host, size, created_at, created_by), never
+  binary, so the payload stays cheap. Covers BOTH files explicitly uploaded to
+  a task AND images pasted inline into a comment thread (Asana stores both as
+  attachments on the task). Backed by `GET /tasks/{gid}/attachments` with full
+  pagination. Flags each row as asana-hosted (downloadable) or external-host
+  (Drive/Dropbox/Box/OneDrive &mdash; view_url only).
+- `asana_download_attachment` &mdash; download one attachment's bytes to a local
+  file and return the absolute path. The agent then runs the `read` tool on the
+  path to view an image, or parses a csv/xls/json from disk. Fills the gap that
+  forced an agent to reuse a stale plugin CSV when a task referenced an updated
+  XLS it could not fetch. Backed by `GET /attachments/{gid}` for metadata then a
+  binary fetch of the returned `download_url`.
+- `/asana attachments <gid>` and `/asana download <gid>` slash commands.
+
+### Changed
+- Two non-obvious Asana behaviors drive the download path, both handled in
+  `lib/api.ts`'s new `downloadExternalUrl`:
+  - Asana's `download_url` is an S3 presigned link that MUST be fetched WITHOUT
+    the Bearer token (S3 returns 400/403 on Authorization). The helper sends no
+    auth header; a test locks that invariant.
+  - The URL expires after ~2 min. A non-2xx from S3 surfaces a retryable
+    message pointing back at `asana_download_attachment` to refresh it.
+  - A 120 s download timeout (vs the 30 s JSON timeout), a 100 MB size cap
+    (preflight on Content-Length, post-read for the no-header case), and an
+    abort-mapping around `arrayBuffer()` so a slow/large download fails with
+    the retry hint rather than OOMing the agent or leaking a raw AbortError.
+- External-host attachments (null `download_url`) cannot be auto-downloaded;
+  the tool returns the `view_url` for the agent to open in a browser instead of
+  pretending it can fetch them. An Asana-hosted attachment whose `download_url`
+  is missing reports a retry (not a contradictory "externally hosted (asana)").
+- The 404 "attachment not found" message is scoped to the metadata call only;
+  an S3 403/404 from an expired link surfaces the retry hint instead (it would
+  otherwise send the agent into a re-list loop on the same GID).
+- Downloaded files land in a **per-process scratch dir** under `os.tmpdir()`
+  (`lib/scratch-dir.ts`) that is wiped on process exit, so files never
+  accumulate across sessions and the agent never needs a cleanup routine.
+  `os.tmpdir()` is used (not a hardcoded `/tmp`) so it resolves correctly per
+  platform: `/tmp` on Linux, the per-user sandbox temp on macOS, `%TEMP%` on
+  Windows. An explicit `output_dir` override stays caller-owned (not
+  auto-cleaned).
+  - Cleanup fires on `process.exit` AND on SIGINT/SIGTERM/SIGHUP/SIGBREAK (the
+    signals whose default disposition bypasses `exit`); handlers wipe the dir
+    and re-raise so pi's own signal handling stays in control. A monotonic
+    generation counter closes the reset-during-`mkdtemp` race so a reset can
+    never leak a stray dir or a dangling exit listener.
+- Caller- or Asana-supplied filenames are sanitized to a safe basename (path
+  separators, drive letters, leading dots, NUL/shell chars, Windows reserved
+  device names, 200-char length cap) so a hostile attachment name cannot escape
+  `output_dir`.
+- Tool surface: 14 &rarr; 16 tools. README + system-prompt TOOL_GUIDANCE updated
+  to tell the agent when to reach for the attachment pair.
+
 ## 1.4.1 — 2026-07-29
 
 ### Changed

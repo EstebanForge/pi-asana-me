@@ -180,3 +180,120 @@ describe("callAsana URL building", () => {
     expect(new URL(calledUrl).pathname).toBe("/api/1.0/tasks/123");
   });
 });
+
+describe("downloadExternalUrl", () => {
+  function makeBinary(text: string, contentType = "application/octet-stream") {
+    const ab = new TextEncoder().encode(text).buffer as ArrayBuffer;
+    const headers = new Headers();
+    headers.set("content-type", contentType);
+    return {
+      ok: true,
+      status: 200,
+      arrayBuffer: async () => ab,
+      text: async () => text,
+      headers,
+    } as unknown as Response;
+  }
+
+  it("sends NO Authorization header (S3 presigned links reject the token)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(makeBinary("x", "text/csv"));
+    vi.stubGlobal("fetch", fetchMock);
+    const { downloadExternalUrl } = await import("../lib/api");
+    await downloadExternalUrl("https://s3.example/presigned");
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const [, init] = fetchMock.mock.calls[0] as [unknown, RequestInit];
+    const headers = init.headers as Record<string, string> | undefined;
+    expect(headers?.Authorization).toBeUndefined();
+    // Belt-and-braces: the init must not carry an Authorization at all.
+    expect(init.headers).toBeUndefined();
+  });
+
+  it("returns the bytes + content-type", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(makeBinary("hello", "text/csv")));
+    const { downloadExternalUrl } = await import("../lib/api");
+    const out = await downloadExternalUrl("https://s3.example/x");
+    expect(out.contentType).toBe("text/csv");
+    expect(new Uint8Array(out.bytes).length).toBe(5);
+  });
+
+  it("maps a non-2xx to AsanaError with a refresh hint", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        text: async () => "forbidden",
+        headers: new Headers(),
+      } as unknown as Response),
+    );
+    const { downloadExternalUrl, AsanaError } = await import("../lib/api");
+    await expect(downloadExternalUrl("https://s3.example/x")).rejects.toThrow(AsanaError);
+    await expect(downloadExternalUrl("https://s3.example/x")).rejects.toThrow(/HTTP 403/);
+  });
+
+  it("refuses an object whose Content-Length exceeds the cap BEFORE buffering", async () => {
+    const headers = new Headers();
+    headers.set("content-type", "video/mp4");
+    // Declare a size past the 100 MB cap.
+    headers.set("content-length", String(150 * 1024 * 1024));
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      // If the code ignored the preflight and buffered, this would OOM. Keep
+      // the body tiny; the assertion is that we never call arrayBuffer().
+      arrayBuffer: async () => {
+        throw new Error("arrayBuffer must not be read when Content-Length exceeds the cap");
+      },
+      text: async () => "",
+      headers,
+    } as unknown as Response);
+    vi.stubGlobal("fetch", fetchMock);
+    const { downloadExternalUrl, AsanaError } = await import("../lib/api");
+    await expect(downloadExternalUrl("https://s3.example/huge")).rejects.toThrow(AsanaError);
+    await expect(downloadExternalUrl("https://s3.example/huge")).rejects.toThrow(/too large/i);
+  });
+
+  it("refuses a too-large body when Content-Length is absent", async () => {
+    // No content-length header: the post-read byte-length guard must catch it.
+    const oversized = new Uint8Array(101 * 1024 * 1024);
+    const headers = new Headers();
+    headers.set("content-type", "application/octet-stream");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        arrayBuffer: async () => oversized.buffer as ArrayBuffer,
+        text: async () => "",
+        headers,
+      } as unknown as Response),
+    );
+    const { downloadExternalUrl, AsanaError } = await import("../lib/api");
+    await expect(downloadExternalUrl("https://s3.example/big")).rejects.toThrow(AsanaError);
+    await expect(downloadExternalUrl("https://s3.example/big")).rejects.toThrow(/too large/i);
+  });
+
+  it("maps a mid-stream abort on arrayBuffer() to the retry hint, not a raw AbortError", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        // fetch succeeded but the body read aborted (the realistic failure
+        // mode for a slow/large download hitting the timeout).
+        arrayBuffer: async () => {
+          const err = new Error("The operation was aborted");
+          err.name = "AbortError";
+          throw err;
+        },
+        text: async () => "",
+        headers: new Headers(),
+      } as unknown as Response),
+    );
+    const { downloadExternalUrl, AsanaError } = await import("../lib/api");
+    await expect(downloadExternalUrl("https://s3.example/x")).rejects.toThrow(AsanaError);
+    // Must surface the retry hint, NOT a raw "operation was aborted" leak.
+    await expect(downloadExternalUrl("https://s3.example/x")).rejects.toThrow(/timed out/);
+    await expect(downloadExternalUrl("https://s3.example/x")).rejects.toThrow(/retry/i);
+  });
+});

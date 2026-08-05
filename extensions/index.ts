@@ -1,13 +1,13 @@
 /**
  * pi-asana-me - Asana Work Graph tools for pi.
  *
- * Adds 14 LLM-callable tools that talk to the Asana REST API
+ * Adds 16 LLM-callable tools that talk to the Asana REST API
  * (https://app.asana.com/api/1.0) over plain HTTP+JSON. No MCP server install
  * is required: this extension issues standard REST calls with a personal
  * access token (PAT) read from the ASANA_ACCESS_TOKEN environment variable.
  *
  * The tool surface mirrors a curated subset of the official Asana MCP server
- * (https://developers.asana.com/docs/mcp-tools-reference). The 14 tools cover
+ * (https://developers.asana.com/docs/mcp-tools-reference). The 16 tools cover
  * the read-then-write flows an LLM agent actually needs; noisy duplicates and
  * Claude/ChatGPT-only confirmation-UI tools are intentionally omitted.
  *
@@ -36,6 +36,8 @@ import { updateTasksTool } from "../lib/tools/update-tasks";
 import { addCommentTool } from "../lib/tools/comment-add";
 import { getCommentTool } from "../lib/tools/comment-get";
 import { getTaskCommentsTool } from "../lib/tools/comment-list";
+import { listAttachmentsTool } from "../lib/tools/attachment-list";
+import { downloadAttachmentTool } from "../lib/tools/attachment-download";
 import {
   CONFIRM_WRITE_FLAG,
   CONFIRM_WRITE_FLAG_DESCRIPTION,
@@ -54,6 +56,7 @@ const TOOL_GUIDANCE = [
   "asana_get_task truncates the notes/description to 2000 chars; call asana_get_task_description for the full, untruncated body when you need the whole spec.",
   "Use asana_get_status_overview for cross-project rollups; do not chain a search before it.",
   "Comments live on the stories endpoint, not the task; use asana_get_task_comments to read recent comment threads on demand (default: last 5). Long comments truncate at 700 chars; the footer prints the story_gid to pass to asana_get_comment for the full body.",
+  "Attachments (files uploaded to a task AND images pasted inline into comments) are listed with asana_list_attachments; download one with asana_download_attachment, then run the read tool on the returned path to view an image or parse a csv/xls.",
   "Write tools (asana_create_tasks, asana_update_tasks, asana_add_comment) prompt the user for review before posting to Asana when the `asana-confirm-write` flag is on (default). Call them directly: the extension shows the drafted payload for accept/edit/cancel. The agent does NOT need to ask the user itself.",
 ].join(" ");
 
@@ -84,6 +87,8 @@ function asana(pi: ExtensionAPI): void {
   pi.registerTool(addCommentTool);
   pi.registerTool(getTaskCommentsTool);
   pi.registerTool(getCommentTool);
+  pi.registerTool(listAttachmentsTool);
+  pi.registerTool(downloadAttachmentTool);
 
   pi.on("before_agent_start", async (event) => {
     return {
@@ -106,6 +111,8 @@ function asana(pi: ExtensionAPI): void {
   //   /asana status <gids>            -> asana_get_status_overview
   //   /asana comments <gid> [N]       -> asana_get_task_comments
   //   /asana comment <gid>            -> asana_get_comment
+  //   /asana attachments <gid>        -> asana_list_attachments
+  //   /asana download <gid>           -> asana_download_attachment
   //   /asana create <text>            -> hint with asana_create_tasks
   //   /asana config                   -> settings modal (write review gate)
   //   /asana confirm on|off           -> toggle write review gate
@@ -116,7 +123,7 @@ function asana(pi: ExtensionAPI): void {
   // to run; the agent picks the right tool from the prefill.
   pi.registerCommand("asana", {
     description:
-      'Asana tools. Usage: /asana me | /asana my [incomplete|completed] | /asana show <gid> | /asana project <gid> | /asana search <workspace> <query> | /asana status <gid> [<gid>...] | /asana comments <gid> [N] | /asana comment <gid> | /asana create <free-form description> | /asana config | /asana confirm on|off.',
+      'Asana tools. Usage: /asana me | /asana my [incomplete|completed] | /asana show <gid> | /asana project <gid> | /asana search <workspace> <query> | /asana status <gid> [<gid>...] | /asana comments <gid> [N] | /asana comment <gid> | /asana attachments <gid> | /asana download <gid> | /asana create <free-form description> | /asana config | /asana confirm on|off.',
     handler: async (args, ctx) => {
       const trimmed = args.trim();
       if (!trimmed) {
@@ -224,6 +231,31 @@ function asana(pi: ExtensionAPI): void {
           prompt = `Call the asana_get_comment tool with story_gid="${rest}" to fetch the full, untruncated text of that comment.`;
           break;
         }
+        case "attachments":
+        case "files": {
+          // /asana attachments <task_gid> -> list files + inline images on a task.
+          if (!/^\d+$/.test(rest)) {
+            ctx.ui.notify(
+              "Usage: /asana attachments <task gid>\nExample: /asana attachments 1234567890123456",
+              "warning",
+            );
+            return;
+          }
+          prompt = `Call the asana_list_attachments tool with task_gid="${rest}" to list every file and inline image attached to that task.`;
+          break;
+        }
+        case "download": {
+          // /asana download <attachment_gid> -> fetch one attachment to disk.
+          if (!/^\d+$/.test(rest)) {
+            ctx.ui.notify(
+              "Usage: /asana download <attachment gid>\nExample: /asana download 1234567890123456\n(Get the attachment gid from /asana attachments.)",
+              "warning",
+            );
+            return;
+          }
+          prompt = `Call the asana_download_attachment tool with attachment_gid="${rest}" to download that attachment to a local file. For an image, run the read tool on the returned path to view it.`;
+          break;
+        }
         case "config": {
           // /asana config -> interactive settings modal (TUI) or status (else).
           // File-backed (lib/confirm.ts): stages flips in the SettingsList, then
@@ -253,7 +285,7 @@ function asana(pi: ExtensionAPI): void {
           prompt = `Help me create an Asana task. Read the user's request carefully, resolve any project / assignee names to GIDs via asana_search_objects first, then call asana_create_tasks with the resolved fields. Request: ${rest}`;
           break;
         default:
-          prompt = `The user typed "/asana ${trimmed}" with an unknown verb. Show the available verbs (me, my, show, project, search, status, comments, comment, create, config, confirm) and ask what they want.`;
+          prompt = `The user typed "/asana ${trimmed}" with an unknown verb. Show the available verbs (me, my, show, project, search, status, comments, comment, attachments, download, create, config, confirm) and ask what they want.`;
           break;
       }
 

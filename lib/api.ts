@@ -179,6 +179,98 @@ export async function callAsana<T = unknown>(
   }
 }
 
+// Fetch a raw external URL and return its bytes. Used to download Asana
+// attachments: GET /attachments/{gid} returns a `download_url` pointing at an
+// Asana-hosted S3 object, and that S3 URL MUST be fetched WITHOUT the Bearer
+// token (S3 rejects Authorization on presigned links) and is short-lived
+// (~2 min). So this helper sends no auth header, follows redirects, and
+// returns the ArrayBuffer plus the content-type the caller renders. Errors
+// map to AsanaError so the tool boundary keeps one error class.
+//
+// Binary-specific tuning (vs callAsana's JSON path):
+//   - DOWNLOAD_TIMEOUT_MS is longer than the 30s JSON timeout: a 50 MB XLS on
+//     a slow link legitimately needs >30s to stream.
+//   - MAX_DOWNLOAD_BYTES caps the buffered object so a 100 MB attachment
+//     cannot OOM the agent process; the caller tells the agent to use the
+//     view_url instead.
+//   - The body read is wrapped in the SAME abort mapping as the fetch, so a
+//     mid-stream timeout surfaces the retry hint, not a raw "aborted".
+const DOWNLOAD_TIMEOUT_MS = 120_000;
+// Asana's own per-attachment ceiling is 100 MB; mirror it as our hard cap.
+const MAX_DOWNLOAD_BYTES = 100 * 1024 * 1024;
+
+export async function downloadExternalUrl(
+  url: string,
+): Promise<{
+  bytes: ArrayBuffer;
+  contentType: string;
+}> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT_MS);
+
+  // Map any AbortError (fetch OR body read) to the same retry hint. Pulled
+  // into a helper so both fetch failure and arrayBuffer() failure share it.
+  const mapAbort = (err: unknown): AsanaError => {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("abort")) {
+      return new AsanaError(
+        `Asana download timed out after ${DOWNLOAD_TIMEOUT_MS / 1000}s. The download_url may have expired; retry asana_download_attachment to refresh it.`,
+      );
+    }
+    return new AsanaError(`Network error downloading attachment: ${msg}`);
+  };
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "GET",
+      // Intentionally NO Authorization header: the download_url is an S3
+      // presigned link. Sending the Asana Bearer token here makes S3 return
+      // 400/403 (confirmed via Asana forum reports).
+      signal: controller.signal,
+    });
+  } catch (err) {
+    clearTimeout(timer);
+    throw mapAbort(err);
+  }
+
+  try {
+    if (!response.ok) {
+      throw new AsanaError(
+        `Attachment download failed (HTTP ${response.status}). The download_url may have expired; retry asana_download_attachment to refresh it.`,
+        response.status,
+      );
+    }
+    // Preflight on Content-Length when the server sends it, so we refuse a
+    // too-large object BEFORE buffering it.
+    const declared = Number(response.headers.get("content-length") ?? 0);
+    if (declared > MAX_DOWNLOAD_BYTES) {
+      throw new AsanaError(
+        `Attachment too large (${declared} bytes > ${MAX_DOWNLOAD_BYTES} byte cap). Open the view_url instead of fetching it into the agent process.`,
+      );
+    }
+    let bytes: ArrayBuffer;
+    try {
+      bytes = await response.arrayBuffer();
+    } catch (err) {
+      // A streaming abort escapes the fetch try above; catch it here so the
+      // agent sees the retry hint rather than a raw AbortError.
+      throw mapAbort(err);
+    }
+    // Defend the no-Content-Length case: confirm the buffered size too.
+    if (bytes.byteLength > MAX_DOWNLOAD_BYTES) {
+      throw new AsanaError(
+        `Attachment too large (${bytes.byteLength} bytes > ${MAX_DOWNLOAD_BYTES} byte cap). Open the view_url instead of fetching it into the agent process.`,
+      );
+    }
+    const contentType =
+      response.headers.get("content-type") ?? "application/octet-stream";
+    return { bytes, contentType };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // Like callAsana, but for paged collection endpoints. Returns the unwrapped
 // `data` array alongside the `next_page.offset` cursor so callers can walk all
 // pages. Use this instead of callAsana whenever the endpoint may paginate.

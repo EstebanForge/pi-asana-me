@@ -92,6 +92,30 @@ export interface AsanaUser {
   workspaces?: AsanaRef[];
 }
 
+// Asana attachment (file/image/etc.) on a task. `host` decides whether we can
+// auto-download: "asana" attachments carry a live `download_url` (S3 presigned,
+// ~2 min TTL, must be fetched WITHOUT the Bearer token); external hosts
+// (gdrive/dropbox/box/onedrive/...) leave `download_url` null and only expose
+// a browser `view_url` we hand back to the agent.
+export interface AsanaAttachment {
+  gid: string;
+  resource_type?: string;
+  // Always "file" for Asana-hosted uploads today, but kept string for safety.
+  resource_subtype?: string;
+  name?: string;
+  // "asana" | "external" | "dropbox" | "gdrive" | "box" | "onedrive" | ...
+  host?: string;
+  // Temporary S3 URL when host=asana; null/empty for external hosts.
+  download_url?: string | null;
+  // Browser-friendly link; always present. The only link we can return for
+  // external-host attachments.
+  view_url?: string;
+  size?: number | null;
+  created_at?: string;
+  created_by?: AsanaUserCompact | null;
+  parent?: AsanaRef | null;
+}
+
 export interface AsanaStory {
   gid: string;
   created_at?: string;

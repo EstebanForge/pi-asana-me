@@ -10,7 +10,6 @@
 //   - search_tasks          (Premium-only; overlaps asana_search_objects)
 //   - get_portfolio(s)      (niche in agent flows)
 //   - get_items_for_portfolio (niche)
-//   - get_attachments       (returns binary blobs)
 //   - get_user / get_users  (use asana_search_objects with resource_type=user)
 //   - get_teams             (rarely requested)
 //   - get_agent(s)          (AI Teammates only)
@@ -18,6 +17,9 @@
 //   - create_project        (high-blast-radius; add later)
 //   - create_project_status_update (niche)
 //   - *preview tools        (Claude/ChatGPT confirmation UI; no UI in pi)
+// Attachments are supported, split into a metadata list
+// (asana_list_attachments) and a disk download (asana_download_attachment)
+// instead of the MCP server's binary-blob get_attachments.
 
 // ---------------------------------------------------------------- search ---
 
@@ -190,3 +192,31 @@ export const GET_COMMENT_DESCRIPTION = `Full, untruncated text of a single comme
 
 export const GET_COMMENT_STORY_GID_DESCRIPTION =
   "Story (comment) GID, e.g. \"1234567890123456\". Copy it from asana_get_task_comments output, where each comment is labeled \"(story gid: ...)\".";
+
+// --------------------------------------------------------- attachments (files/images) ---
+
+// Attachments live on a task (files uploaded to the task, OR images pasted
+// inline into a comment - both are attachments under the hood). The official
+// Asana MCP server ships a single get_attachments that returns binary blobs;
+// that is hostile to an LLM agent context. We split it in two: a cheap metadata
+// list, and an on-demand binary download that writes to disk and returns a
+// local path the agent can then `read` (images) or parse (xls/csv/json).
+export const ATTACHMENTS_LIST_TITLE = "Asana: List Task Attachments";
+
+export const ATTACHMENTS_LIST_DESCRIPTION = `List files and images attached to a task. Covers BOTH files uploaded to the task AND images pasted inline into comments (inline images are attachments too). Returns metadata only: gid, name, host, size, created_at, created_by - NO binary. Use when a task or comment references a file/image you need to open, or to discover the attachment_gid for asana_download_attachment. For the XLS/CSV/PDF/ZIP the user mentioned, or an image pasted into a comment thread, start here.`;
+
+export const ATTACHMENTS_LIST_TASK_GID_DESCRIPTION =
+  "Task GID whose attachments to list (e.g. \"1234567890123456\"). Get from asana_search_objects / asana_get_task / a comment thread.";
+
+export const ATTACHMENT_DOWNLOAD_TITLE = "Asana: Download Attachment";
+
+export const ATTACHMENT_DOWNLOAD_DESCRIPTION = `Download one attachment's bytes to a local file and return the path. Use to open an XLS/CSV/PDF/ZIP a task references, or to fetch an image so you can view it (run the read tool on the returned path for images). For Asana-hosted files: writes the file to disk and returns the absolute path. For external hosts (Google Drive/Dropbox/Box/OneDrive): cannot auto-download; returns the view_url for the agent to open in a browser. Use AFTER asana_list_attachments gives you an attachment_gid.`;
+
+export const ATTACHMENT_DOWNLOAD_GID_DESCRIPTION =
+  "Attachment GID to download (e.g. \"1234567890123456\"). Get from asana_list_attachments output.";
+
+export const ATTACHMENT_DOWNLOAD_OUTPUT_DIR_DESCRIPTION =
+  "Directory to write the file into. When omitted, writes into a per-process temp dir under the OS temp folder that is auto-removed when the pi session ends, so files never accumulate and you do NOT need to clean them up. Pass this only when you want to keep the file beyond the session; a caller-supplied dir is caller-owned (not auto-cleaned). Absolute or relative; the filename is always the attachment's own name.";
+
+export const ATTACHMENT_DOWNLOAD_FILENAME_DESCRIPTION =
+  "Override filename (basename only; directory components stripped). Defaults to the attachment's own name, or the attachment gid when Asana omits the name.";

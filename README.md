@@ -137,6 +137,39 @@ Reach for them in this order:
 - The 16-tool surface omits several official MCP tools that did not age well in an LLM agent context: interactive `*_preview` tools (Claude/ChatGPT-only confirmation UI), `search_tasks` (Premium-only; overlaps `search_objects`), `get_portfolio*` (niche), `get_agent*` (AI Teammates only), and `delete_task` (destructive &mdash; add on request). Attachments ARE supported, split into a metadata list (`asana_list_attachments`) and an on-demand disk download (`asana_download_attachment`) instead of the MCP server's binary-blob `get_attachments`.
 - Do not pass secrets or PII in `notes` or `text` arguments to write tools &mdash; they land in your Asana workspace directly.
 
+## Comment formatting (HTML &amp; mentions)
+
+`asana_add_comment` sends plain text by default. Set `html: true` to send Asana [`html_text`](https://developers.asana.com/docs/rich-text) when you need an @-mention or inline formatting. Plain text is almost always the right choice; reach for HTML only for mentions or bold/italic/code/lists.
+
+**The footgun.** Asana does **not** reject malformed `html_text`. The request returns HTTP 201, but the comment is stored as literal plain text with every tag visible (`<body>`, `<a ...>`, the lot). One unsupported tag, or one unresolvable mention, poisons the whole comment with no error signal. ([Forum corroboration](https://forum.asana.com/t/adding-richtext-story-results-in-comment-with-html-code-still-in-it-if-paragraph-tags-are-used/60593).)
+
+This extension guards against that: when `html: true`, the tool validates the body and **refuses to post** if it would trigger the fallback, returning the exact reason.
+
+**Rules when `html: true`:**
+
+| | |
+| --- | --- |
+| Wrapper | The entire body MUST be a single `<body>...</body>`. |
+| Allowed tags | `body`, `strong`/`b`, `em`/`i`, `u`, `s`, `code`, `ol`, `ul`, `li`, `a`, `blockquote`, `pre`. |
+| NOT allowed | `<br>`, `<p>`, `<div>`, `<span>`, `<h1>`-`<h6>`, `<hr>`. Any one triggers the silent fallback. |
+| Paragraphs | Comments have no reliable break tag. For multi-paragraph prose, drop the `html` flag and send plain text with real newlines. |
+| @-mention | `<a data-asana-gid="USER_GID"></a>` (self-closing `<a data-asana-gid="USER_GID"/>` also works). Inner text is ignored and auto-filled. Resolve `USER_GID` via `asana_search_objects` with `resource_type="user"`; a profile/person GID will not render as a mention. |
+| Notification | A mention only notifies that user if they are already a follower or assignee of the task. Otherwise add them as a follower first. |
+
+**Good:**
+
+```
+html: true
+text: <body>Ship cutoff is <strong>Friday</strong>. CC <a data-asana-gid="123"></a>.</body>
+```
+
+**Bad (refused by the guard):**
+
+```
+html: true
+text: <p>One paragraph.</p><p>Another.</p>      // no <body>; <p> unsupported
+```
+
 ## License
 
 MIT

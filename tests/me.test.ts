@@ -78,13 +78,19 @@ describe("asana_add_comment", () => {
     const body = JSON.parse(init.body as string) as { data: Record<string, unknown> };
     expect(body).toEqual({ data: { text: "hi" } });
 
-    // Now with html=true
+    // Now with html=true. The body must be valid Asana html_text: a single
+    // <body> wrapper using only allowed tags, else the tool refuses it
+    // (preventing Asana's silent literal-text fallback).
     fetchMock.mockClear();
-    await invoke(addCommentTool, { task_gid: "t2", text: "<b>hi</b>", html: true });
+    await invoke(addCommentTool, {
+      task_gid: "t2",
+      text: "<body><b>hi</b></body>",
+      html: true,
+    });
     // Note: invoke() defaults to a headless ctx (hasUI: false), so the
     // confirm gate short-circuits and these assertions exercise the POST path.
     const [, init2] = fetchMock.mock.calls[0] as [unknown, RequestInit];
     const body2 = JSON.parse(init2.body as string) as { data: Record<string, unknown> };
-    expect(body2).toEqual({ data: { html_text: "<b>hi</b>" } });
+    expect(body2).toEqual({ data: { html_text: "<body><b>hi</b></body>" } });
   });
 });

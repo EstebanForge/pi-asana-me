@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.5.3 — 2026-08-10
+
+### Added
+- **`asana_add_comment` HTML validation + guidance.** When `html: true`, the tool validates the body against Asana's `html_text` rules and refuses to post payloads that would trigger Asana's silent literal-text fallback (missing `<body>` wrapper, or any unsupported tag such as `<br>`/`<p>`/`<div>`). Asana returns HTTP 201 for malformed `html_text` but stores the entire comment as literal text with the tags visible; the guard returns a precise reason instead so the agent can fix and retry. Plain-text comments (`html` falsy) are never validated. Backed by unit tests covering refusal (no `<body>`, `<br>`, `<p>`) and acceptance (valid body + mention).
+
+### Changed
+- Documented the Asana `html_text` contract in three agent-facing places: the `html` and `text` parameter descriptions (`lib/prompts.ts`), a rule line in the system-prompt `TOOL_GUIDANCE` (`extensions/index.ts`), and a new "Comment formatting (HTML &amp; mentions)" section in the README. The allowed tag set (body, strong/b, em/i, u, s, code, ol, ul, li, a, blockquote, pre), the `<a data-asana-gid="USER_GID"></a>` mention form, and the follower-required notification caveat are now spelled out so agents do not invent unsupported markup.
+- Updated the pre-existing `html_text` test in `tests/me.test.ts` to use a valid `<body>`-wrapped payload; the prior `<b>hi</b>` example would now be (correctly) refused by the guard.
+
 ## 1.5.1 — 2026-08-06
 
 ### Changed

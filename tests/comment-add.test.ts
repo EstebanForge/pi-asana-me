@@ -84,3 +84,114 @@ describe("asana_add_comment success summary", () => {
     expect(text).not.toContain("URL:");
   });
 });
+
+describe("asana_add_comment html_text validation", () => {
+  beforeEach(() => {
+    process.env.ASANA_ACCESS_TOKEN = "test-token";
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    delete process.env.ASANA_ACCESS_TOKEN;
+  });
+
+  // Asana does not 400 on bad html_text; it silently stores the whole comment
+  // as literal text (HTTP 201). The guard refuses such payloads before any
+  // network call so the agent can fix and retry.
+  it("refuses html=true without a <body> wrapper and never calls Asana", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { addCommentTool } = await import("../lib/tools/comment-add");
+    const text = firstText(
+      await invoke(addCommentTool, {
+        task_gid: "1",
+        html: true,
+        text: "<strong>hi</strong>",
+      }),
+    );
+
+    expect(text).toContain("refused to post html_text");
+    expect(text).toContain("<body>");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("refuses html=true with a <br> tag (the silent-fallback footgun)", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { addCommentTool } = await import("../lib/tools/comment-add");
+    const text = firstText(
+      await invoke(addCommentTool, {
+        task_gid: "1",
+        html: true,
+        text: "<body>one<br>two</body>",
+      }),
+    );
+
+    expect(text).toContain("Unsupported tag");
+    expect(text).toContain("<br>");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("refuses html=true with a <p> tag", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { addCommentTool } = await import("../lib/tools/comment-add");
+    const text = firstText(
+      await invoke(addCommentTool, {
+        task_gid: "1",
+        html: true,
+        text: "<body><p>x</p></body>",
+      }),
+    );
+
+    expect(text).toContain("<p>");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("accepts html=true with a valid <body> + mention and sends html_text", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(storyResponse("777", "2026-08-10T00:00:00.000Z"))
+      .mockResolvedValueOnce(taskResponse("1"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { addCommentTool } = await import("../lib/tools/comment-add");
+    const text = firstText(
+      await invoke(addCommentTool, {
+        task_gid: "1",
+        html: true,
+        text: '<body>Hi <a data-asana-gid="123"></a></body>',
+      }),
+    );
+
+    expect(text).toContain("story gid: 777");
+    // First fetch is the POST /stories; its body must carry html_text.
+    const postBody = fetchMock.mock.calls[0][1].body as string;
+    expect(postBody).toContain('"html_text"');
+    expect(postBody).toContain("<body>");
+  });
+
+  it("does not validate html=false (literal tags in plain prose pass as text)", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(storyResponse("888", "2026-08-10T00:00:00.000Z"))
+      .mockResolvedValueOnce(taskResponse("1"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { addCommentTool } = await import("../lib/tools/comment-add");
+    const text = firstText(
+      await invoke(addCommentTool, {
+        task_gid: "1",
+        text: "see <body> and <br> as literal text",
+      }),
+    );
+
+    expect(text).toContain("story gid: 888");
+    const postBody = fetchMock.mock.calls[0][1].body as string;
+    expect(postBody).toContain('"text"');
+    expect(postBody).not.toContain('"html_text"');
+  });
+});

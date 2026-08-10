@@ -58,6 +58,7 @@ const TOOL_GUIDANCE = [
   "Comments live on the stories endpoint, not the task; use asana_get_task_comments to read recent comment threads on demand (default: last 5). Long comments truncate at 700 chars; the footer prints the story_gid to pass to asana_get_comment for the full body.",
   "Attachments (files uploaded to a task AND images pasted inline into comments) are listed with asana_list_attachments; download one with asana_download_attachment, then run the read tool on the returned path to view an image or parse a csv/xls.",
   "Write tools (asana_create_tasks, asana_update_tasks, asana_add_comment) prompt the user for review before posting to Asana when the `asana-confirm-write` flag is on (default). Call them directly: the extension shows the drafted payload for accept/edit/cancel. The agent does NOT need to ask the user itself.",
+  "asana_add_comment: default to plain text. Only set html=true for @-mentions or inline formatting, and then the body MUST be a single <body>...</body> using ONLY these tags: body, strong/b, em/i, u, s, code, ol, ul, li, a, blockquote, pre. NO <br>, <p>, <div>, <span>, headers, or <hr> — Asana does not error on a bad tag; it silently stores the WHOLE comment as literal text (tags visible, HTTP 201). @-mention form: <a data-asana-gid=\"USER_GID\"></a> with a real user GID from asana_search_objects. The tool validates html_text and refuses payloads that would trigger the silent fallback.",
 ].join(" ");
 
 function asana(pi: ExtensionAPI): void {

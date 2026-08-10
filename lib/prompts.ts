@@ -162,12 +162,23 @@ export const UPDATE_TASKS_OPT_FIELDS_DESCRIPTION =
 
 export const ADD_COMMENT_TITLE = "Asana: Add Comment";
 
-export const ADD_COMMENT_DESCRIPTION = `Post comment to task. Supports plain text/HTML and @-mentions. Use for discussion, not auto-logged actions.`;
+export const ADD_COMMENT_DESCRIPTION = `Post a comment (story) to a task. Use for discussion, not auto-logged actions. Body defaults to plain text; set html=true to send Asana html_text for @-mentions or inline formatting. When html=true the body MUST follow the html_text rules on the \`text\` parameter (single <body> wrapper, allowed tags only) or Asana silently stores the ENTIRE comment as literal text with the tags visible and NO error (HTTP 201).`;
 
 export const ADD_COMMENT_TASK_DESCRIPTION = "Target task GID.";
 
-export const ADD_COMMENT_TEXT_DESCRIPTION =
-  "Comment body. Plain text default; pass html parameter for markup.";
+export const ADD_COMMENT_HTML_DESCRIPTION =
+  "Send the \`text\` as Asana html_text instead of plain text. Default false. Only use when you need an @-mention or inline formatting (bold/italic/code/list); for plain prose keep it false. When true, \`text\` MUST be valid Asana html_text: wrapped in a single <body>...</body> and using ONLY allowed tags (see the \`text\` parameter docs). The tool refuses to post html_text that would trigger Asana's silent literal-text fallback.";
+
+export const ADD_COMMENT_TEXT_DESCRIPTION = [
+  "Comment body. Plain text by default; real newlines render as line breaks.",
+  "Set html=true ONLY for @-mentions or inline formatting. In html mode the body is sent as Asana html_text and MUST follow these rules, or Asana silently stores the ENTIRE comment as literal text (tags visible, no error, HTTP 201):",
+  "- Wrap everything in a single <body>...</body>.",
+  "- Allowed tags ONLY: body, strong/b, em/i, u, s, code, ol, ul, li, a, blockquote, pre.",
+  "- NOT allowed (any one triggers the silent literal-text fallback): <br>, <p>, <div>, <span>, <h1>-<h6>, <hr>. For multi-paragraph prose, use plain text (html omitted/false) with real newlines instead.",
+  "- @-mention: <a data-asana-gid=\"USER_GID\"></a> (self-closing <a data-asana-gid=\"USER_GID\"/> also works). Inner text is ignored and auto-filled by Asana. Resolve USER_GID via asana_search_objects with resource_type=\"user\"; a profile/person GID will not render as a mention.",
+  "- A mention only notifies that user if they are already a follower or assignee of the task; otherwise add them as a follower first.",
+  "- Escape literal < and & in prose; > is allowed in text content (so PHP \"=>\" is fine).",
+].join(" ");
 
 // ----------------------------------------------------- task comments (read) -
 

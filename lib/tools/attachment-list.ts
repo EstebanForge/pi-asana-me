@@ -49,7 +49,7 @@ function humanSize(bytes: number | null | undefined): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export const listAttachmentsTool: ToolDefinition<typeof Params, undefined> = {
+export const listAttachmentsTool: ToolDefinition<typeof Params, AsanaDetails> = {
   name: "asana_list_attachments",
   label: ATTACHMENTS_LIST_TITLE,
   description: ATTACHMENTS_LIST_DESCRIPTION,

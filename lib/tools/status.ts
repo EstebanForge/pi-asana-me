@@ -21,7 +21,7 @@ const Params = Type.Object({
   }),
 });
 
-export const statusOverviewTool: ToolDefinition<typeof Params, undefined> = {
+export const statusOverviewTool: ToolDefinition<typeof Params, AsanaDetails> = {
   name: "asana_get_status_overview",
   label: STATUS_OVERVIEW_TITLE,
   description: STATUS_OVERVIEW_DESCRIPTION,

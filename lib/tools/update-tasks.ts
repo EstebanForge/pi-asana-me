@@ -39,7 +39,7 @@ const Params = Type.Object({
   }),
 });
 
-export const updateTasksTool: ToolDefinition<typeof Params, undefined> = {
+export const updateTasksTool: ToolDefinition<typeof Params, AsanaDetails> = {
   name: "asana_update_tasks",
   label: UPDATE_TASKS_TITLE,
   description: UPDATE_TASKS_DESCRIPTION,

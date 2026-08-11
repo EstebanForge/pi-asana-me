@@ -81,7 +81,7 @@ const Params = Type.Object({
   ),
 });
 
-export const getTaskCommentsTool: ToolDefinition<typeof Params, undefined> = {
+export const getTaskCommentsTool: ToolDefinition<typeof Params, AsanaDetails> = {
   name: "asana_get_task_comments",
   label: TASK_COMMENTS_TITLE,
   description: TASK_COMMENTS_DESCRIPTION,

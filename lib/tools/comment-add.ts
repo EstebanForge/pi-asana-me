@@ -6,7 +6,7 @@ import type {
 import { callAsana, AsanaError } from "../api";
 import { confirmWrite, willPromptForWrite } from "../confirm";
 import { resolveTasks, fmtTask, type ResolvedRef } from "../resolve";
-import { toToolResult, errorText, type AsanaDetails } from "../result";
+import { toToolResult, errorText, postedContentBlock, type AsanaDetails } from "../result";
 import type { AsanaStory } from "../types";
 import {
   ADD_COMMENT_TITLE,
@@ -86,7 +86,7 @@ function validateHtmlText(text: string): string[] {
   return problems;
 }
 
-export const addCommentTool: ToolDefinition<typeof Params, undefined> = {
+export const addCommentTool: ToolDefinition<typeof Params, AsanaDetails> = {
   name: "asana_add_comment",
   label: ADD_COMMENT_TITLE,
   description: ADD_COMMENT_DESCRIPTION,
@@ -157,10 +157,12 @@ export const addCommentTool: ToolDefinition<typeof Params, undefined> = {
         )?.permalink_url;
       }
       const urlPart = permalink ? ` URL: ${permalink}` : "";
+      const edited = decision.edited ?? false;
       return toToolResult(
         `Asana: comment added to task ${params.task_gid} (story gid: ${story.gid}, at ${
           story.created_at ?? "(no timestamp)"
-        }).${urlPart}`,
+        }).${urlPart}${postedContentBlock(text, edited)}`,
+        { postedContent: text, edited },
       );
     } catch (err) {
       if (err instanceof AsanaError && err.status === 404) {

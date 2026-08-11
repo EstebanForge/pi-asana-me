@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.4 — 2026-08-11
+
+### Added
+- **`asana_add_comment` reports the actual posted content and an `edited` flag.** The success result appends a labeled "Edited by user: yes|no / Final content sent" block, so the agent's later turns know exactly what reached Asana and whether the human changed the draft in the review dialog. The content is also mirrored into structured `details` as `{ postedContent, edited }`. Previously the tool returned only the story gid and timestamp, so after an edit the agent had no record of what actually shipped.
+
 ## 1.5.3 — 2026-08-10
 
 ### Added

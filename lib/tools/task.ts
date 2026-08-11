@@ -63,7 +63,7 @@ function formatRefList(refs: AsanaRef[] | undefined, indent: string): string[] {
   return refs.map((r) => `${indent}- ${r.name ?? "(unnamed)"} (gid: ${r.gid})`);
 }
 
-export const getTaskTool: ToolDefinition<typeof Params, undefined> = {
+export const getTaskTool: ToolDefinition<typeof Params, AsanaDetails> = {
   name: "asana_get_task",
   label: GET_TASK_TITLE,
   description: GET_TASK_DESCRIPTION,

@@ -128,12 +128,25 @@ export interface ConfirmWriteOptions {
   editableText?: string;
   /** Readable payload preview, shown by confirm() in the non-editable path. */
   summary: string;
+  /**
+   * Optional normalizer applied to BOTH the editor return and the prefill
+   * before the `edited` flag is computed. Pass the same transformation the
+   * tool applies just before transmission, so a whitespace-only edit that is
+   * stripped before sending does NOT count as edited. Default is identity.
+   */
+  normalize?: (text: string) => string;
 }
 
 export interface ConfirmOutcome {
   proceed: boolean;
   /** Final text to send. Equals the (possibly edited) text in the editable path. */
   text?: string;
+  /**
+   * True when the human changed the agent's draft in the review dialog. Lets a
+   * write tool tell the agent its original wording was NOT what shipped. Only
+   * meaningful when `proceed` is true; unset on cancel/refuse paths.
+   */
+  edited?: boolean;
 }
 
 /**
@@ -150,18 +163,23 @@ export async function confirmWrite(
   opts: ConfirmWriteOptions,
 ): Promise<ConfirmOutcome> {
   if (!getConfirmWriteEnabled()) {
-    return { proceed: true, text: opts.editableText };
+    return { proceed: true, text: opts.editableText, edited: false };
   }
   // No interactive UI (headless / RPC without dialogs) -> cannot prompt;
   // proceed rather than deadlocking an unsupervised run.
   if (!ctx.hasUI) {
-    return { proceed: true, text: opts.editableText };
+    return { proceed: true, text: opts.editableText, edited: false };
   }
 
   if (opts.editableText !== undefined) {
     const edited = await ctx.ui.editor(opts.title, opts.editableText);
     if (edited === undefined) return { proceed: false };
-    return { proceed: true, text: edited };
+    const norm = opts.normalize ?? ((s: string) => s);
+    return {
+      proceed: true,
+      text: edited,
+      edited: norm(edited) !== norm(opts.editableText),
+    };
   }
 
   const ok = await ctx.ui.confirm(opts.title, opts.summary);

@@ -28,7 +28,7 @@ const GetProjectParams = Type.Object({
   ),
 });
 
-export const getProjectTool: ToolDefinition<typeof GetProjectParams, undefined> = {
+export const getProjectTool: ToolDefinition<typeof GetProjectParams, AsanaDetails> = {
   name: "asana_get_project",
   label: GET_PROJECT_TITLE,
   description: GET_PROJECT_DESCRIPTION,
@@ -98,7 +98,7 @@ const GetProjectsParams = Type.Object({
   limit: Type.Optional(Type.Number({ minimum: 1, maximum: 100 })),
 });
 
-export const getProjectsTool: ToolDefinition<typeof GetProjectsParams, undefined> = {
+export const getProjectsTool: ToolDefinition<typeof GetProjectsParams, AsanaDetails> = {
   name: "asana_get_projects",
   label: GET_PROJECTS_TITLE,
   description: GET_PROJECTS_DESCRIPTION,

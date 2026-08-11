@@ -73,7 +73,7 @@ export function safeFilename(name: string | undefined, fallback: string): string
   return cleaned.length > 0 ? cleaned : fallback;
 }
 
-export const downloadAttachmentTool: ToolDefinition<typeof Params, undefined> = {
+export const downloadAttachmentTool: ToolDefinition<typeof Params, AsanaDetails> = {
   name: "asana_download_attachment",
   label: ATTACHMENT_DOWNLOAD_TITLE,
   description: ATTACHMENT_DOWNLOAD_DESCRIPTION,

@@ -36,7 +36,7 @@ const Params = Type.Object({
   ),
 });
 
-export const searchObjectsTool: ToolDefinition<typeof Params, undefined> = {
+export const searchObjectsTool: ToolDefinition<typeof Params, AsanaDetails> = {
   name: "asana_search_objects",
   label: SEARCH_TITLE,
   description: SEARCH_DESCRIPTION,

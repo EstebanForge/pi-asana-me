@@ -26,7 +26,7 @@ const Params = Type.Object({
   limit: Type.Optional(Type.Number({ minimum: 1, maximum: 100 })),
 });
 
-export const getMyTasksTool: ToolDefinition<typeof Params, undefined> = {
+export const getMyTasksTool: ToolDefinition<typeof Params, AsanaDetails> = {
   name: "asana_get_my_tasks",
   label: GET_MY_TASKS_TITLE,
   description: GET_MY_TASKS_DESCRIPTION,

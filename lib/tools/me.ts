@@ -14,7 +14,7 @@ const Params = Type.Object({
   ),
 });
 
-export const getMeTool: ToolDefinition<typeof Params, undefined> = {
+export const getMeTool: ToolDefinition<typeof Params, AsanaDetails> = {
   name: "asana_get_me",
   label: ME_TITLE,
   description: ME_DESCRIPTION,

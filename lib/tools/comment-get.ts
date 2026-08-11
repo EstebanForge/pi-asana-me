@@ -23,7 +23,7 @@ const Params = Type.Object({
   story_gid: Type.String({ description: GET_COMMENT_STORY_GID_DESCRIPTION }),
 });
 
-export const getCommentTool: ToolDefinition<typeof Params, undefined> = {
+export const getCommentTool: ToolDefinition<typeof Params, AsanaDetails> = {
   name: "asana_get_comment",
   label: GET_COMMENT_TITLE,
   description: GET_COMMENT_DESCRIPTION,

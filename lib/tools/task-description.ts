@@ -19,7 +19,7 @@ const Params = Type.Object({
   gid: Type.String({ description: GET_TASK_GID_DESCRIPTION }),
 });
 
-export const getTaskDescriptionTool: ToolDefinition<typeof Params, undefined> = {
+export const getTaskDescriptionTool: ToolDefinition<typeof Params, AsanaDetails> = {
   name: "asana_get_task_description",
   label: GET_TASK_NOTES_TITLE,
   description: GET_TASK_NOTES_DESCRIPTION,

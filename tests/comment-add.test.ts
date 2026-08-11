@@ -54,15 +54,24 @@ describe("asana_add_comment success summary", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const { addCommentTool } = await import("../lib/tools/comment-add");
-    const text = firstText(
-      await invoke(addCommentTool, {
-        task_gid: "1216960660986098",
-        text: "Deploy confirmed.",
-      }),
-    );
+    const result = await invoke(addCommentTool, {
+      task_gid: "1216960660986098",
+      text: "Deploy confirmed.",
+    });
+    const text = firstText(result);
 
     expect(text).toContain("story gid: 999");
     expect(text).toContain("URL: https://app.asana.com/0/1/1216960660986098");
+    // The success result now tells the agent exactly what reached Asana and
+    // whether the user edited it (headless fast path here -> not edited), so
+    // later turns do not trust the original draft blindly.
+    expect(text).toContain("Edited by user: no");
+    expect(text).toContain("Final content sent:");
+    expect(text).toContain("Deploy confirmed.");
+    expect(result.details).toMatchObject({
+      postedContent: "Deploy confirmed.",
+      edited: false,
+    });
   });
 
   it("omits the URL gracefully when the task has no permalink_url", async () => {
@@ -82,6 +91,43 @@ describe("asana_add_comment success summary", () => {
 
     expect(text).toContain("story gid: 999");
     expect(text).not.toContain("URL:");
+  });
+
+  it("echoes the edited text and edited=yes when the user changes the draft", async () => {
+    // Interactive UI ctx: the gate resolves the task up front (GET), opens the
+    // editor, then POSTs. Give the task a permalink so the post-POST resolve
+    // is skipped (keeps this to two fetches).
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        taskResponse("1216960660986098", "https://app.asana.com/0/1/1216960660986098"),
+      )
+      .mockResolvedValueOnce(storyResponse("555", "2026-07-29T14:44:49.151Z"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const editor = vi.fn().mockResolvedValue("edited body");
+    const ctx = { hasUI: true, ui: { confirm: vi.fn(), editor } } as unknown;
+
+    const { addCommentTool } = await import("../lib/tools/comment-add");
+    const result = await invoke(
+      addCommentTool,
+      { task_gid: "1216960660986098", text: "original body" },
+      ctx,
+    );
+    const text = firstText(result);
+
+    // The POST used the EDITED text, not the agent's original draft.
+    const postBody = JSON.parse(
+      (fetchMock.mock.calls[1][1] as RequestInit).body as string,
+    );
+    expect(postBody).toEqual({ data: { text: "edited body" } });
+    // The result tells the agent the draft was changed and exactly what shipped.
+    expect(text).toContain("Edited by user: yes");
+    expect(text).toContain("edited body");
+    expect(result.details).toMatchObject({
+      postedContent: "edited body",
+      edited: true,
+    });
   });
 });
 

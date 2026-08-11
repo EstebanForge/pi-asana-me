@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.5 — 2026-08-11
+
+### Changed
+- **`asana_add_comment` no longer echoes the posted content when the draft was not edited.** The content block and `details` are now emitted only when the human changed the draft in the review dialog. When the draft shipped verbatim the agent already has that text in its own context, so echoing it duplicated tokens for no information gain. The success line stays terse (e.g. `Asana: comment added to task 123 (story gid: 999, at ...).`).
+
 ## 1.5.4 — 2026-08-11
 
 ### Added

@@ -62,16 +62,11 @@ describe("asana_add_comment success summary", () => {
 
     expect(text).toContain("story gid: 999");
     expect(text).toContain("URL: https://app.asana.com/0/1/1216960660986098");
-    // The success result now tells the agent exactly what reached Asana and
-    // whether the user edited it (headless fast path here -> not edited), so
-    // later turns do not trust the original draft blindly.
-    expect(text).toContain("Edited by user: no");
-    expect(text).toContain("Final content sent:");
-    expect(text).toContain("Deploy confirmed.");
-    expect(result.details).toMatchObject({
-      postedContent: "Deploy confirmed.",
-      edited: false,
-    });
+    // Headless fast path -> not edited -> the draft is NOT re-echoed (the
+    // agent already has it in context). No block, no details.
+    expect(text).not.toContain("Edited by user");
+    expect(text).not.toContain("Final content sent");
+    expect(result.details).toBeUndefined();
   });
 
   it("omits the URL gracefully when the task has no permalink_url", async () => {

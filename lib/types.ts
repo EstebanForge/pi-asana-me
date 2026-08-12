@@ -54,6 +54,34 @@ export interface AsanaTaskCompact {
   permalink_url?: string;
 }
 
+// A custom field value on a task. `resource_subtype`/`type` is one of "text",
+// "number", or "enum". For enum fields the current value is `enum_value` and
+// the legal choices live in `enum_options`; for text/number the value is in
+// `text_value`/`number_value`. `display_value` is Asana's human rendering.
+export interface AsanaCustomFieldEnumOption {
+  gid: string;
+  name?: string;
+  enabled?: boolean;
+  color?: string;
+}
+
+export interface AsanaCustomField {
+  gid: string;
+  name?: string;
+  resource_subtype?: string; // "text" | "number" | "enum"
+  type?: string; // mirrors resource_subtype on task projections
+  enabled?: boolean;
+  description?: string;
+  text_value?: string | null;
+  number_value?: number | null;
+  enum_value?: AsanaCustomFieldEnumOption | null;
+  display_value?: string | null;
+  enum_options?: AsanaCustomFieldEnumOption[];
+  precision?: number;
+  format?: string;
+  currency_code?: string | null;
+}
+
 export interface AsanaProjectStatus {
   gid: string;
   title?: string;

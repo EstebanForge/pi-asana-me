@@ -1,6 +1,6 @@
 # @estebanforge/pi-asana-me
 
-Asana Work Graph tool for the [pi coding agent](https://pi.dev). Adds 16 LLM-callable tools (asana_*) that query the Asana REST API over plain HTTP, mirroring a curated subset of the official Asana MCP tool set &mdash; **no MCP server install required**.
+Asana Work Graph tool for the [pi coding agent](https://pi.dev). Adds 18 LLM-callable tools (asana_*) that query the Asana REST API over plain HTTP, mirroring a curated subset of the official Asana MCP tool set &mdash; **no MCP server install required**.
 
 ## Install
 
@@ -28,6 +28,8 @@ pi install npm:@estebanforge/pi-asana-me
 | `asana_create_tasks` | Create up to 50 tasks in a single call. Write. |
 | `asana_update_tasks` | Update up to 50 tasks in a single call. Write. |
 | `asana_add_comment` | Add a text or HTML comment to a task. Write. |
+| `asana_get_custom_fields` | Read every custom field on a task: name, type (text/number/enum), enum options, current value, gid. Read. |
+| `asana_set_custom_fields` | Set custom fields by name (enum options resolve to gids; text/number coerced; null clears). Write. |
 
 Compact tool guidance is injected via the `before_agent_start` hook (no skill file, to keep token cost minimal). A `/asana <verb> [args]` slash command pins intent for direct invocation.
 
@@ -49,10 +51,11 @@ If the environment variable is missing, every tool returns a single error messag
 
 ### Write review gate (default on)
 
-The three write tools (`asana_add_comment`, `asana_create_tasks`, `asana_update_tasks`) prompt you for review before posting:
+The four write tools (`asana_add_comment`, `asana_create_tasks`, `asana_update_tasks`, `asana_set_custom_fields`) prompt you for review before posting:
 
 - **Comments** open in an editable preview &mdash; trim the model's prose, then accept (Enter) or cancel (Esc). The posted text is whatever you leave in the editor. The dialog title shows the target task's **name and Asana URL**, not just its GID.
 - **Task batches** show a readable summary and ask yes/no. Each task (and its `parent`, where set) renders as `'Name' (url)` when resolvable.
+- **Custom fields** (`asana_set_custom_fields`) show a yes/no summary with the task's **name and Asana URL** at the top, then each field as `name = value`. Enum values render by option name, `null` as `(clear)`. If any field can't be resolved before the dialog (unknown name, invalid enum option, unsupported type such as date/people/multi_enum, ambiguous name), the whole batch is refused with a per-field reason and nothing is written.
 - Summaries resolve GIDs to names + URLs best-effort; any GID that can't be resolved falls back to `gid: <gid>`, so nothing ever blocks on a lookup miss.
 - In **headless** sessions (no interactive UI) the gate is skipped so unsupervised runs never deadlock, and no extra lookups are issued.
 

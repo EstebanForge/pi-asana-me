@@ -160,6 +160,25 @@ export const UPDATE_TASKS_TASKS_DESCRIPTION =
 export const UPDATE_TASKS_OPT_FIELDS_DESCRIPTION =
   "Optional opt_fields. Defaults to \"name,completed\".";
 
+// ----------------------------------------------------------- custom fields -
+
+export const GET_CUSTOM_FIELDS_TITLE = "Asana: Get Custom Fields";
+
+export const GET_CUSTOM_FIELDS_DESCRIPTION = `Read every custom field on a task: name, type (text/number/enum), current display value, gid, and enum options. Use before asana_set_custom_fields to learn what is settable and to discover the legal enum option names. Not gated. asana_get_task returns only a compact custom_fields projection; this tool returns the full shape.`;
+
+export const GET_CUSTOM_FIELDS_GID_DESCRIPTION =
+  "Task GID (e.g. \"1234567890123456\"). Get from workspace, search, or parent task.";
+
+export const SET_CUSTOM_FIELDS_TITLE = "Asana: Set Custom Fields";
+
+export const SET_CUSTOM_FIELDS_DESCRIPTION = `Set one or more custom fields on a task. Key the \`fields\` map by field NAME (or gid): { "Testing Site": "https://..." }. Enum values are matched to option names and resolved to option gids automatically; text and number values are coerced. Pass null to clear a field. Gated by the same review dialog as the other write tools. Discover field names and enum options first with asana_get_custom_fields.`;
+
+export const SET_CUSTOM_FIELDS_TASK_GID_DESCRIPTION =
+  "Task GID (e.g. \"1234567890123456\").";
+
+export const SET_CUSTOM_FIELDS_FIELDS_DESCRIPTION =
+  "Map of { field_name: value }. Key by field name (or gid). Text -> string, number -> number, enum -> option name. null clears. Example: { \"Testing Site\": \"https://oba.ind.ninja/\", \"Status\": \"In Progress\" }.";
+
 export const ADD_COMMENT_TITLE = "Asana: Add Comment";
 
 export const ADD_COMMENT_DESCRIPTION = `Post a comment (story) to a task. Use for discussion, not auto-logged actions. Body defaults to plain text; set html=true to send Asana html_text for @-mentions or inline formatting. When html=true the body MUST follow the html_text rules on the \`text\` parameter (single <body> wrapper, allowed tags only) or Asana silently stores the ENTIRE comment as literal text with the tags visible and NO error (HTTP 201).`;

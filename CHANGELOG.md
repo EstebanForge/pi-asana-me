@@ -1,5 +1,57 @@
 # Changelog
 
+## 1.6.0 — 2026-08-12
+
+### Added
+- **`asana_get_custom_fields`** &mdash; read every custom field on a task with its
+  full shape: name, type (text/number/enum), current display value, gid, and
+  (for enum) the legal option list. `asana_get_task` returns only a compact
+  projection (gid/name/display_value), which hides the field type and the enum
+  options an agent needs to write safely. Pair this tool with
+  `asana_set_custom_fields`. Backed by `GET /tasks/{gid}` with a full
+  `custom_fields.*` opt_fields projection.
+- **`asana_set_custom_fields`** &mdash; set one or more custom fields on a task,
+  keyed by field NAME (or gid). Enum option names resolve to option gids
+  automatically; text and number values are coerced; `null` clears any type.
+  Gated by the same review dialog as the other write tools. Backed by a schema
+  `GET /tasks/{gid}` (to resolve names/options) followed by
+  `PUT /tasks/{gid}` with a `custom_fields` body. Resolution is all-or-nothing:
+  if any field is unresolvable, the whole batch is refused before the dialog
+  and nothing is written.
+- Tool surface: 16 &rarr; 18 tools. README + system-prompt `TOOL_GUIDANCE` and
+  the `extensions/index.ts` header updated.
+
+### Fixed
+- **`asana_set_custom_fields` no longer writes a silent `0` on empty number
+  input.** `Number("")` and `Number("   ")` are `0`, not `NaN`, so the NaN
+  guard would have coerced an empty/whitespace value to `0`. The number branch
+  now rejects empty strings and tells the agent to pass `null` to clear.
+- **`asana_set_custom_fields` rejects unsupported field types explicitly**
+  (`date`, `people`, `multi_enum`, `formula`, and anything later) instead of
+  falling through to `String(value)` and surfacing an opaque Asana 400. The
+  error names the type and the supported set.
+- **Ambiguous field names are now refused.** A multi-project task can carry the
+  SAME field name from two projects (distinct gids); name lookup previously
+  picked the first silently and wrote to the wrong field. It now reports both
+  gids and asks the agent to key by gid.
+- **Disabled enum options can no longer be set.** Matching previously searched
+  all options while the error list filtered to enabled ones; both paths now
+  filter `enabled !== false`, so a disabled choice is rejected and the hint
+  list matches.
+- `fieldType()` (the `resource_subtype ?? type ?? "text"` normalization) moved
+  into a shared `lib/custom-fields.ts`; the two tool files no longer carry
+  duplicate copies.
+- The `asana_set_custom_fields` confirm dialog now shows the task's **permalink
+  URL** (it rides the existing schema GET, no extra round-trip), matching the
+  other write tools.
+- New `tests/custom-fields-get.test.ts` and `tests/custom-fields-set.test.ts`
+  (21 tests) cover name/gid/case-insensitive resolution, enum option
+  resolution, number coercion, null-clearing, the empty-number and
+  unsupported-type rejections, ambiguity, disabled-option filtering, the
+  all-or-nothing batch abort, a post-confirm PUT failure, the schema GET
+  opt_fields, and the interactive review gate (cancel / proceed / dialog
+  text) under `hasUI: true`.
+
 ## 1.5.5 — 2026-08-11
 
 ### Changed

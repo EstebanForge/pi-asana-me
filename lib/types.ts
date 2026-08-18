@@ -158,4 +158,8 @@ export interface AsanaStory {
   text?: string;
   html_text?: string;
   created_by?: AsanaUserCompact | null;
+  // True only for comments the authenticated user (PAT owner) can edit.
+  // System stories and other people's comments return false; PUT /stories on
+  // them fails. https://developers.asana.com/reference/updatestory
+  is_editable?: boolean;
 }

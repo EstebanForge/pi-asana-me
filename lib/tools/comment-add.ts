@@ -54,7 +54,8 @@ const ALLOWED_HTML_TAGS = new Set([
 // hard rules Asana documents (body wrapper + allowed tag set). It cannot catch
 // an unresolvable mention GID or multi-line quirks without a live call, so the
 // prompt guidance carries those as soft rules.
-function validateHtmlText(text: string): string[] {
+// Exported: asana_update_comment validates edited comments with the SAME rules.
+export function validateHtmlText(text: string): string[] {
   const problems: string[] = [];
 
   const trimmed = text.trim();

@@ -199,6 +199,19 @@ export const ADD_COMMENT_TEXT_DESCRIPTION = [
   "- Escape literal < and & in prose; > is allowed in text content (so PHP \"=>\" is fine).",
 ].join(" ");
 
+export const UPDATE_COMMENT_TITLE = "Asana: Update Comment";
+
+export const UPDATE_COMMENT_DESCRIPTION = `Edit the text of a comment previously posted. Use to correct a comment you (the agent, via asana_add_comment, or the authenticated user) already posted. Only comments authored by the authenticated user are editable; system stories and other people's comments are refused (post a new comment instead). The tool fetches the existing body first and refuses non-editable stories before any write. Review-gated like the other write tools: the editor is prefilled with the NEW text.`;
+
+export const UPDATE_COMMENT_STORY_GID_DESCRIPTION =
+  "Story (comment) GID to edit, e.g. \"1234567890123456\". Copy it from asana_get_task_comments output (\"(story gid: ...)\") or a prior asana_add_comment result.";
+
+export const UPDATE_COMMENT_TEXT_DESCRIPTION =
+  "The FULL replacement comment body (not a delta). Plain text by default; same rules as asana_add_comment's text parameter.";
+
+export const UPDATE_COMMENT_HTML_DESCRIPTION =
+  "Send the `text` as Asana html_text instead of plain text. Same rules and validation as asana_add_comment's html parameter.";
+
 // ----------------------------------------------------- task comments (read) -
 
 export const TASK_COMMENTS_TITLE = "Asana: Get Task Comments";

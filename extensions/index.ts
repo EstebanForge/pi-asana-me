@@ -1,13 +1,13 @@
 /**
  * pi-asana-me - Asana Work Graph tools for pi.
  *
- * Adds 18 LLM-callable tools that talk to the Asana REST API
+ * Adds 19 LLM-callable tools that talk to the Asana REST API
  * (https://app.asana.com/api/1.0) over plain HTTP+JSON. No MCP server install
  * is required: this extension issues standard REST calls with a personal
  * access token (PAT) read from the ASANA_ACCESS_TOKEN environment variable.
  *
  * The tool surface mirrors a curated subset of the official Asana MCP server
- * (https://developers.asana.com/docs/mcp-tools-reference). The 18 tools cover
+ * (https://developers.asana.com/docs/mcp-tools-reference). The 19 tools cover
  * the read-then-write flows an LLM agent actually needs; noisy duplicates and
  * Claude/ChatGPT-only confirmation-UI tools are intentionally omitted.
  *
@@ -36,6 +36,7 @@ import { updateTasksTool } from "../lib/tools/update-tasks";
 import { getCustomFieldsTool } from "../lib/tools/custom-fields-get";
 import { setCustomFieldsTool } from "../lib/tools/custom-fields-set";
 import { addCommentTool } from "../lib/tools/comment-add";
+import { updateCommentTool } from "../lib/tools/comment-update";
 import { getCommentTool } from "../lib/tools/comment-get";
 import { getTaskCommentsTool } from "../lib/tools/comment-list";
 import { listAttachmentsTool } from "../lib/tools/attachment-list";
@@ -57,9 +58,10 @@ const TOOL_GUIDANCE = [
   "Use asana_get_tasks with one of project/section/tag/assignee for bulk reads; asana_get_task for full detail on one task.",
   "asana_get_task truncates the notes/description to 2000 chars; call asana_get_task_description for the full, untruncated body when you need the whole spec.",
   "Use asana_get_status_overview for cross-project rollups; do not chain a search before it.",
+  "asana_update_comment edits a comment previously posted (own comments only; system stories and other people's comments are refused). The `text` is the FULL replacement body, not a delta.",
   "Comments live on the stories endpoint, not the task; use asana_get_task_comments to read recent comment threads on demand (default: last 5). Long comments truncate at 700 chars; the footer prints the story_gid to pass to asana_get_comment for the full body.",
   "Attachments (files uploaded to a task AND images pasted inline into comments) are listed with asana_list_attachments; download one with asana_download_attachment, then run the read tool on the returned path to view an image or parse a csv/xls.",
-  "Write tools (asana_create_tasks, asana_update_tasks, asana_add_comment) prompt the user for review before posting to Asana when the `asana-confirm-write` flag is on (default). Call them directly: the extension shows the drafted payload for accept/edit/cancel. The agent does NOT need to ask the user itself.",
+  "Write tools (asana_create_tasks, asana_update_tasks, asana_add_comment, asana_update_comment) prompt the user for review before posting to Asana when the `asana-confirm-write` flag is on (default). Call them directly: the extension shows the drafted payload for accept/edit/cancel. The agent does NOT need to ask the user itself.",
   "Custom fields: use asana_get_custom_fields to read a task's field schema (name, type, enum options, current value) and asana_set_custom_fields to write them by NAME (enum option names resolve to gids automatically; text/number coerced; null clears). set_custom_fields is review-gated like the other write tools.",
   "asana_add_comment: default to plain text. Only set html=true for @-mentions or inline formatting, and then the body MUST be a single <body>...</body> using ONLY these tags: body, strong/b, em/i, u, s, code, ol, ul, li, a, blockquote, pre. NO <br>, <p>, <div>, <span>, headers, or <hr> — Asana does not error on a bad tag; it silently stores the WHOLE comment as literal text (tags visible, HTTP 201). @-mention form: <a data-asana-gid=\"USER_GID\"></a> with a real user GID from asana_search_objects. The tool validates html_text and refuses payloads that would trigger the silent fallback.",
 ].join(" ");
@@ -91,6 +93,7 @@ function asana(pi: ExtensionAPI): void {
   pi.registerTool(getCustomFieldsTool);
   pi.registerTool(setCustomFieldsTool);
   pi.registerTool(addCommentTool);
+  pi.registerTool(updateCommentTool);
   pi.registerTool(getTaskCommentsTool);
   pi.registerTool(getCommentTool);
   pi.registerTool(listAttachmentsTool);

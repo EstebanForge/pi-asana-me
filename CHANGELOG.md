@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.6.1 — 2026-08-12
+
+### Added
+- **`asana_update_comment`** &mdash; edit the text of a comment previously
+  posted. Backed by `PUT /stories/{gid}` (plain `text` or `html_text`). The
+  tool fetches the story first and refuses non-editable stories (system
+  stories, other people's comments) before any write; only comments authored
+  by the authenticated user are editable. Same html_text validation and
+  write review gate as `asana_add_comment`; the editor is prefilled with the
+  new replacement body. Tool surface: 18 &rarr; 19 tools.
+
 ## 1.6.0 — 2026-08-12
 
 ### Added

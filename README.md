@@ -1,6 +1,6 @@
 # @estebanforge/pi-asana-me
 
-Asana Work Graph tool for the [pi coding agent](https://pi.dev). Adds 18 LLM-callable tools (asana_*) that query the Asana REST API over plain HTTP, mirroring a curated subset of the official Asana MCP tool set &mdash; **no MCP server install required**.
+Asana Work Graph tool for the [pi coding agent](https://pi.dev). Adds 19 LLM-callable tools (asana_*) that query the Asana REST API over plain HTTP, mirroring a curated subset of the official Asana MCP tool set &mdash; **no MCP server install required**.
 
 ## Install
 
@@ -28,6 +28,7 @@ pi install npm:@estebanforge/pi-asana-me
 | `asana_create_tasks` | Create up to 50 tasks in a single call. Write. |
 | `asana_update_tasks` | Update up to 50 tasks in a single call. Write. |
 | `asana_add_comment` | Add a text or HTML comment to a task. Write. |
+| `asana_update_comment` | Edit the text of a comment previously posted (own comments only). Write. |
 | `asana_get_custom_fields` | Read every custom field on a task: name, type (text/number/enum), enum options, current value, gid. Read. |
 | `asana_set_custom_fields` | Set custom fields by name (enum options resolve to gids; text/number coerced; null clears). Write. |
 
@@ -51,7 +52,7 @@ If the environment variable is missing, every tool returns a single error messag
 
 ### Write review gate (default on)
 
-The four write tools (`asana_add_comment`, `asana_create_tasks`, `asana_update_tasks`, `asana_set_custom_fields`) prompt you for review before posting:
+The five write tools (`asana_add_comment`, `asana_update_comment`, `asana_create_tasks`, `asana_update_tasks`, `asana_set_custom_fields`) prompt you for review before posting:
 
 - **Comments** open in an editable preview &mdash; trim the model's prose, then accept (Enter) or cancel (Esc). The posted text is whatever you leave in the editor. The dialog title shows the target task's **name and Asana URL**, not just its GID.
 - **Task batches** show a readable summary and ask yes/no. Each task (and its `parent`, where set) renders as `'Name' (url)` when resolvable.
@@ -128,11 +129,11 @@ Reach for them in this order:
 9. `asana_get_comment` &mdash; the full, untruncated body of a single comment. Reach for it when a comment's truncation marker fired and that comment is the work (a decision, a Q&A, a spec).
 10. `asana_list_attachments` &mdash; files uploaded to a task AND images pasted inline into comments both live here. Call it whenever a task or comment references an attached file/image, to discover the `attachment_gid` for the next step.
 11. `asana_download_attachment` &mdash; fetch one attachment's bytes to a local file (returns the path). Run the `read` tool on the path to view an image, or parse a csv/xls/json from disk. External hosts (Drive/Dropbox/Box/OneDrive) return a `view_url` instead of a file.
-12. Write tools (`create_tasks`, `update_tasks`, `add_comment`) &mdash; only after you have the IDs. The extension shows the drafted payload for accept/edit/cancel; you do not need to ask the user first.
+12. Write tools (`create_tasks`, `update_tasks`, `add_comment`, `update_comment`) &mdash; only after you have the IDs. The extension shows the drafted payload for accept/edit/cancel; you do not need to ask the user first.
 
 ## Notes
 
-- These tools make real calls against your Asana workspace. Write tools (`create_tasks`, `update_tasks`, `add_comment`) prompt you for review before posting when the write review gate is on (default); see [Configuration](#configuration).
+- These tools make real calls against your Asana workspace. Write tools (`create_tasks`, `update_tasks`, `add_comment`, `update_comment`) prompt you for review before posting when the write review gate is on (default); see [Configuration](#configuration).
 - The typeahead endpoint (`asana_search_objects`) accepts only ONE resource type per call (single enum `task` / `project` / `user` / `tag`); it does not accept a CSV. Call the tool once per type to fan out across types.
 - The `/tasks` endpoint requires either project/section/tag, OR (assignee AND workspace). `asana_get_my_tasks` enforces this by making `workspace` a required parameter.
 - Asana enforces rate limits (~150 req/min per PAT). A 429 response surfaces a clear retry message.

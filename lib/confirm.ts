@@ -21,7 +21,7 @@
 // keeps the value live across the session without a reload, and durable across
 // restarts. `piDir` = process.env.PI_CODING_AGENT_DIR || ~/.pi/agent.
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { fmtTask, type ResolvedRef } from "./resolve";
@@ -97,7 +97,12 @@ export function setConfirmWriteEnabled(value: boolean): boolean {
   const path = join(dir, SETTINGS_FILENAME);
   try {
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-    writeFileSync(path, JSON.stringify({ confirmWrite: value }, null, 2) + "\n", "utf8");
+    // Atomic write: stage to a temp file in the same directory, then rename.
+    // A crash mid-write cannot leave a truncated/empty settings file (which
+    // would silently reset the gate to its default on the next read).
+    const tmp = join(dir, `.${SETTINGS_FILENAME}.${process.pid}.tmp`);
+    writeFileSync(tmp, JSON.stringify({ confirmWrite: value }, null, 2) + "\n", "utf8");
+    renameSync(tmp, path);
     return true;
   } catch {
     // Disk write failed (permissions, read-only fs). The next read still
@@ -158,6 +163,52 @@ export interface ConfirmOutcome {
  * own file-backed module state instead. The asana-confirm-write flag is still
  * registered for /settings visibility and CLI `--asana-confirm-write` override.
  */
+// DIALOG SERIALIZATION: pi's interactive UI shows one extension dialog at a
+// time, and an overlapping ctx.ui.confirm/editor call REPLACES the live
+// dialog without settling the replaced promise. With parallel gated tool
+// calls (e.g. three asana_add_comment calls in one batch) the first prompt
+// renders, the rest never do, and their tool calls hang until the run is
+// cancelled. Fix on our side: hold a process-wide FIFO lock only while a
+// dialog is open. The lock is keyed via Symbol.for because all pi-*-me
+// extensions run in the SAME pi process; a per-module lock would still let an
+// asana_add_comment dialog and a git_commit dialog from one parallel batch
+// clobber each other.
+const DIALOG_LOCK: unique symbol = Symbol.for("pi-me.dialog-lock");
+
+interface DialogQueue {
+  tail: Promise<void>;
+}
+
+function dialogQueue(): DialogQueue {
+  const host = globalThis as typeof globalThis & Record<symbol, unknown>;
+  const existing = host[DIALOG_LOCK] as DialogQueue | undefined;
+  if (existing) return existing;
+  const created: DialogQueue = { tail: Promise.resolve() };
+  host[DIALOG_LOCK] = created;
+  return created;
+}
+
+/**
+ * Run `run` while holding the cross-extension dialog lock. FIFO: each caller
+ * chains onto the queue tail synchronously (before its first await), so call
+ * order is the order the dialogs appear. Released in a finally block, so one
+ * throwing dialog can never wedge the queue for the callers behind it.
+ */
+export async function withDialogLock<T>(run: () => Promise<T>): Promise<T> {
+  const queue = dialogQueue();
+  const prev = queue.tail;
+  let release!: () => void;
+  queue.tail = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await prev;
+  try {
+    return await run();
+  } finally {
+    release();
+  }
+}
+
 export async function confirmWrite(
   ctx: ConfirmContext,
   opts: ConfirmWriteOptions,
@@ -171,18 +222,27 @@ export async function confirmWrite(
     return { proceed: true, text: opts.editableText, edited: false };
   }
 
+  // One dialog at a time (see withDialogLock): parallel gated calls queue up
+  // and each prompt is shown in turn instead of clobbering the live dialog.
   if (opts.editableText !== undefined) {
-    const edited = await ctx.ui.editor(opts.title, opts.editableText);
-    if (edited === undefined) return { proceed: false };
-    const norm = opts.normalize ?? ((s: string) => s);
-    return {
-      proceed: true,
-      text: edited,
-      edited: norm(edited) !== norm(opts.editableText),
-    };
+    // Capture the draft so the narrowing survives inside the closure (TS
+    // will not carry the `!== undefined` check across the function boundary).
+    const draft = opts.editableText;
+    return withDialogLock(async () => {
+      const edited = await ctx.ui.editor(opts.title, draft);
+      if (edited === undefined) return { proceed: false };
+      const norm = opts.normalize ?? ((s: string) => s);
+      return {
+        proceed: true,
+        text: edited,
+        edited: norm(edited) !== norm(draft),
+      };
+    });
   }
 
-  const ok = await ctx.ui.confirm(opts.title, opts.summary);
+  const ok = await withDialogLock(() =>
+    ctx.ui.confirm(opts.title, opts.summary),
+  );
   return { proceed: ok };
 }
 
